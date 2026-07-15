@@ -114,7 +114,7 @@ store.addIdea({
 title,
 description: "",
 affectedModules: [],
-status: "OPEN"
+tags: [], status: "BACKLOG"
 });
 dashboardProvider.refresh();
 vscode.window.showInformationMessage("💡 Idea added");

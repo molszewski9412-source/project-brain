@@ -1,5 +1,6 @@
 /**
  * BrainStore - Unified storage for Project Brain
+ * Includes AI Context management
  */
 
 import * as vscode from "vscode";
@@ -16,7 +17,11 @@ BrainRisk,
 BrainRoadmap,
 BrainHistory,
 BrainLink,
+AIContext,
+AIPattern,
+AIConstraint,
 ModuleStatus,
+DecisionStatus,
 } from "../models/ProjectBrain";
 
 export class BrainStore {
@@ -57,7 +62,12 @@ return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 private load(): ProjectBrain {
 if (this.brainFile && fs.existsSync(this.brainFile)) {
 try {
-return JSON.parse(fs.readFileSync(this.brainFile, "utf8"));
+const data = JSON.parse(fs.readFileSync(this.brainFile, "utf8"));
+// Migrate to new format with AIContext
+if (!data.aiContext) {
+data.aiContext = this.createDefaultAIContext();
+}
+return data;
 } catch {
 console.warn("Corrupted brain file, creating new...");
 }
@@ -68,6 +78,7 @@ return this.createDefault();
 save(): void {
 if (!this.initialized) return;
 this.brain.updatedAt = this.getTimestamp();
+this.brain.aiContext.lastContextUpdate = this.getTimestamp();
 if (this.brainFile) {
 fs.writeFileSync(this.brainFile, JSON.stringify(this.brain, null, 2), "utf8");
 }
@@ -76,13 +87,14 @@ fs.writeFileSync(this.brainFile, JSON.stringify(this.brain, null, 2), "utf8");
 private createDefault(): ProjectBrain {
 const workspace = vscode.workspace.workspaceFolders?.[0];
 return {
-version: "1.0.0",
+version: "1.1.0",
 projectName: workspace?.name || "Unknown Project",
 description: "",
 rootPath: workspace?.uri.fsPath || "",
 initialized: false,
 createdAt: this.getTimestamp(),
 updatedAt: this.getTimestamp(),
+aiContext: this.createDefaultAIContext(),
 modules: [],
 tasks: [],
 ideas: [],
@@ -95,6 +107,22 @@ technologyStack: [],
 configFiles: [],
 };
 }
+
+private createDefaultAIContext(): AIContext {
+return {
+projectSummary: "",
+patterns: [],
+constraints: [],
+protectedModules: [],
+protectedFiles: [],
+activeDecisions: [],
+recentChanges: [],
+moduleInsights: {},
+lastContextUpdate: this.getTimestamp(),
+};
+}
+
+// === INITIALIZATION ===
 
 initialize(projectName: string, description: string = ""): void {
 const workspace = vscode.workspace.workspaceFolders?.[0];
@@ -109,6 +137,8 @@ this.addHistory("CREATE", "Project", "brain", `Initialized project: ${projectNam
 this.save();
 }
 
+// === HISTORY ===
+
 private addHistory(action: BrainHistory["action"], target: string, targetId: string, description: string): void {
 this.brain.history.push({
 id: this.generateId(),
@@ -119,6 +149,75 @@ description,
 timestamp: this.getTimestamp(),
 });
 }
+
+getHistory(): BrainHistory[] {
+return (this.brain?.history || []).sort(
+(a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+);
+}
+
+// === AI CONTEXT ===
+
+getAIContext(): AIContext {
+return this.brain?.aiContext || this.createDefaultAIContext();
+}
+
+updateAIContext(updates: Partial<AIContext>): void {
+this.brain.aiContext = { ...this.brain.aiContext, ...updates };
+this.save();
+}
+
+addPattern(pattern: Omit<AIPattern, "id" | "createdAt">): AIPattern {
+const newPattern: AIPattern = {
+...pattern,
+id: this.generateId(),
+createdAt: this.getTimestamp(),
+};
+this.brain.aiContext.patterns.push(newPattern);
+this.save();
+return newPattern;
+}
+
+addConstraint(constraint: Omit<AIConstraint, "id" | "createdAt">): AIConstraint {
+const newConstraint: AIConstraint = {
+...constraint,
+id: this.generateId(),
+createdAt: this.getTimestamp(),
+};
+this.brain.aiContext.constraints.push(newConstraint);
+this.save();
+return newConstraint;
+}
+
+protectModule(moduleId: string, reason: string): void {
+if (!this.brain.aiContext.protectedModules.includes(moduleId)) {
+this.brain.aiContext.protectedModules.push(moduleId);
+const module = this.getModule(moduleId);
+if (module) {
+module.locked = true;
+}
+this.addRecentChange(`Protected module: ${module?.name || moduleId}`, reason);
+this.save();
+}
+}
+
+addRecentChange(what: string, why: string): void {
+this.brain.aiContext.recentChanges.unshift({
+what,
+why,
+when: this.getTimestamp(),
+});
+// Keep only last 20 changes
+this.brain.aiContext.recentChanges = this.brain.aiContext.recentChanges.slice(0, 20);
+this.save();
+}
+
+setModuleInsight(moduleId: string, insight: string): void {
+this.brain.aiContext.moduleInsights[moduleId] = insight;
+this.save();
+}
+
+// === MODULES ===
 
 getModules(): BrainModule[] {
 return this.brain?.modules || [];
@@ -137,6 +236,7 @@ updatedAt: this.getTimestamp(),
 };
 this.brain.modules.push(newModule);
 this.addHistory("CREATE", "Module", newModule.id, `Added module: ${newModule.name}`);
+this.addRecentChange(`Added module: ${newModule.name}`, "New module created");
 this.save();
 return newModule;
 }
@@ -144,15 +244,83 @@ return newModule;
 updateModule(id: string, updates: Partial<BrainModule>): BrainModule {
 const index = this.brain.modules.findIndex((m) => m.id === id);
 if (index === -1) throw new Error(`Module not found: ${id}`);
-this.brain.modules[index] = { ...this.brain.modules[index], ...updates, updatedAt: this.getTimestamp() };
-this.addHistory("UPDATE", "Module", id, `Updated module: ${this.brain.modules[index].name}`);
+
+const module = this.brain.modules[index];
+
+// Check if trying to modify LOCKED module
+if (module.locked && !updates.locked) {
+throw new Error("Cannot modify LOCKED module. Unlock it first.");
+}
+
+this.brain.modules[index] = {
+...module,
+...updates,
+updatedAt: this.getTimestamp(),
+};
+
+this.addHistory("UPDATE", "Module", id, `Updated module: ${module.name}`);
 this.save();
 return this.brain.modules[index];
 }
 
+deleteModule(id: string): void {
+const module = this.getModule(id);
+if (!module) return;
+
+// Check if protected
+if (this.brain.aiContext.protectedModules.includes(id)) {
+throw new Error("Cannot delete protected module");
+}
+
+// Check if locked
+if (module.locked) {
+throw new Error("Cannot delete LOCKED module. Unlock it first.");
+}
+
+this.brain.modules = this.brain.modules.filter((m) => m.id !== id);
+this.addHistory("DELETE", "Module", id, `Deleted module: ${module.name}`);
+this.save();
+}
+
+lockModule(id: string): void {
+const module = this.getModule(id);
+if (!module) return;
+module.locked = true;
+module.status = "LOCKED";
+this.addHistory("LOCK", "Module", id, `Locked module: ${module.name}`);
+this.save();
+}
+
+unlockModule(id: string): void {
+const module = this.getModule(id);
+if (!module) return;
+module.locked = false;
+if (module.status === "LOCKED") {
+module.status = "DONE";
+}
+this.addHistory("UNLOCK", "Module", id, `Unlocked module: ${module.name}`);
+this.save();
+}
+
+// === TASKS ===
+
 getTasks(): BrainTask[] {
 return this.brain?.tasks || [];
 }
+
+addTask(task: Omit<BrainTask, "id" | "createdAt" | "updatedAt">): BrainTask {
+const newTask: BrainTask = {
+...task,
+id: this.generateId(),
+createdAt: this.getTimestamp(),
+updatedAt: this.getTimestamp(),
+};
+this.brain.tasks.push(newTask);
+this.save();
+return newTask;
+}
+
+// === IDEAS ===
 
 getIdeas(): BrainIdea[] {
 return this.brain?.ideas || [];
@@ -165,38 +333,69 @@ id: this.generateId(),
 createdAt: this.getTimestamp(),
 };
 this.brain.ideas.push(newIdea);
-this.addHistory("CREATE", "Idea", newIdea.id, `Added idea: ${newIdea.title}`);
+this.addRecentChange(`Added idea: ${newIdea.title}`, "New idea proposed");
 this.save();
 return newIdea;
 }
+
+// === DECISIONS ===
 
 getDecisions(): BrainDecision[] {
 return this.brain?.decisions || [];
 }
 
-addDecision(decision: Omit<BrainDecision, "id" | "createdAt">): BrainDecision {
+addDecision(decision: Omit<BrainDecision, "id" | "proposedAt">): BrainDecision {
 const newDecision: BrainDecision = {
 ...decision,
 id: this.generateId(),
-createdAt: this.getTimestamp(),
+proposedAt: this.getTimestamp(),
 };
 this.brain.decisions.push(newDecision);
-this.addHistory("CREATE", "Decision", newDecision.id, `Added decision: ${newDecision.title}`);
+this.brain.aiContext.activeDecisions.push(newDecision.id);
 this.save();
 return newDecision;
 }
+
+approveDecision(decisionId: string, by: string = "USER"): void {
+const decision = this.brain.decisions.find((d) => d.id === decisionId);
+if (!decision) return;
+decision.status = "APPROVED";
+decision.resolvedAt = this.getTimestamp();
+decision.resolvedBy = by;
+this.brain.aiContext.activeDecisions = this.brain.aiContext.activeDecisions.filter(
+(id) => id !== decisionId
+);
+this.addRecentChange(`Approved: ${decision.title}`, decision.rationale);
+this.addHistory("APPROVE", "Decision", decisionId, `Approved decision: ${decision.title}`);
+this.save();
+}
+
+rejectDecision(decisionId: string, by: string = "USER"): void {
+const decision = this.brain.decisions.find((d) => d.id === decisionId);
+if (!decision) return;
+decision.status = "REJECTED";
+decision.resolvedAt = this.getTimestamp();
+decision.resolvedBy = by;
+this.brain.aiContext.activeDecisions = this.brain.aiContext.activeDecisions.filter(
+(id) => id !== decisionId
+);
+this.addHistory("REJECT", "Decision", decisionId, `Rejected decision: ${decision.title}`);
+this.save();
+}
+
+// === RISKS ===
 
 getRisks(): BrainRisk[] {
 return this.brain?.risks || [];
 }
 
+// === ROADMAP ===
+
 getRoadmap(): BrainRoadmap[] {
 return (this.brain?.roadmap || []).sort((a, b) => a.order - b.order);
 }
 
-getHistory(): BrainHistory[] {
-return (this.brain?.history || []).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-}
+// === UTILITIES ===
 
 getProjectName(): string {
 return this.brain?.projectName || "Unknown Project";
@@ -211,7 +410,18 @@ isInitialized(): boolean {
 return this.brain?.initialized || false;
 }
 
-getStats(): { modules: number; tasks: number; ideas: number; decisions: number; risks: number; roadmap: number; completedTasks: number; openRisks: number } {
+getStats(): {
+modules: number;
+tasks: number;
+ideas: number;
+decisions: number;
+risks: number;
+roadmap: number;
+completedTasks: number;
+openRisks: number;
+protectedModules: number;
+activeDecisions: number;
+} {
 return {
 modules: this.brain?.modules?.length || 0,
 tasks: this.brain?.tasks?.length || 0,
@@ -221,10 +431,22 @@ risks: this.brain?.risks?.length || 0,
 roadmap: this.brain?.roadmap?.length || 0,
 completedTasks: (this.brain?.tasks || []).filter((t) => t.status === "DONE").length,
 openRisks: (this.brain?.risks || []).filter((r) => r.status === "OPEN").length,
+protectedModules: this.brain?.aiContext?.protectedModules?.length || 0,
+activeDecisions: this.brain?.aiContext?.activeDecisions?.length || 0,
 };
 }
 
-importFromAI(data: { modules?: Array<{ name: string; description: string; status?: string; files?: string[]; dependsOn?: string[] }>; risks?: Array<{ title: string; description: string; severity?: string }>; roadmap?: Array<{ title: string; description: string; order?: number }> }): void {
+importFromAI(data: {
+modules?: Array<{
+name: string;
+description: string;
+status?: string;
+files?: string[];
+dependsOn?: string[];
+}>;
+risks?: Array<{ title: string; description: string; severity?: string }>;
+roadmap?: Array<{ title: string; description: string; order?: number }>;
+}): void {
 const timestamp = this.getTimestamp();
 
 if (data.modules && data.modules.length > 0) {
@@ -269,6 +491,7 @@ updatedAt: timestamp,
 }
 
 this.brain.initialized = true;
+this.brain.aiContext.projectSummary = "Project with " + this.brain.modules.length + " modules";
 this.save();
 }
 }

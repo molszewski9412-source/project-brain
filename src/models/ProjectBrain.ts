@@ -3,201 +3,259 @@
  * Single source of truth for the entire extension
  */
 
+// === STATUS TYPES ===
+
 export type ModuleStatus =
-	| "IDEA"
-	| "PLANNED"
-	| "IN_PROGRESS"
-	| "REVIEW"
-	| "DONE"
-	| "LOCKED"
-	| "ARCHIVED";
+| "IDEA"
+| "PLANNED"
+| "IN_PROGRESS"
+| "REVIEW"
+| "DONE"
+| "LOCKED"
+| "DEPRECATED"
+| "ARCHIVED";
 
 export type TaskStatus =
-	| "BACKLOG"
-	| "TODO"
-	| "IN_PROGRESS"
-	| "REVIEW"
-	| "DONE"
-	| "BLOCKED";
+| "BACKLOG"
+| "TODO"
+| "IN_PROGRESS"
+| "REVIEW"
+| "DONE"
+| "BLOCKED";
 
 export type TaskPriority =
-	| "LOW"
-	| "MEDIUM"
-	| "HIGH"
-	| "CRITICAL";
+| "P4"
+| "P3"
+| "P2"
+| "P1"; // P1 = highest
 
-export type ProposalStatus =
-	| "WAITING_APPROVAL"
-	| "APPROVED"
-	| "REJECTED"
-	| "IMPLEMENTED"
-	| "BLOCKED";
-
-export type ProposalType =
-	| "IMPROVEMENT"
-	| "BUG_FIX"
-	| "ARCHITECTURE_CHANGE"
-	| "NEW_FEATURE";
+export type DecisionStatus =
+| "PROPOSED"
+| "APPROVED"
+| "REJECTED"
+| "DEPRECATED";
 
 export type DecisionType =
-	| "ARCHITECTURE"
-	| "DESIGN"
-	| "PERFORMANCE"
-	| "SECURITY"
-	| "OTHER";
+| "ARCHITECTURE"
+| "DESIGN"
+| "TECHNOLOGY"
+| "PERFORMANCE"
+| "SECURITY"
+| "API"
+| "OTHER";
 
 export type LinkType =
-	| "DEPENDENCY"
-	| "DATA_FLOW"
-	| "REFERENCE";
+| "DEPENDENCY"
+| "DATA_FLOW"
+| "IMPLEMENTS"
+| "EXTENDS";
 
 export type HistoryAction =
-	| "CREATE"
-	| "UPDATE"
-	| "DELETE"
-	| "LOCK"
-	| "APPROVE"
-	| "REJECT";
+| "CREATE"
+| "UPDATE"
+| "DELETE"
+| "LOCK"
+| "UNLOCK"
+| "APPROVE"
+| "REJECT";
 
-/**
- * BrainModule - Core building block of the project
- */
+// === AI CONTEXT ===
+
+export interface AIPattern {
+id: string;
+name: string;
+description: string;
+pattern: string; // e.g., "singleton", "repository", "factory"
+moduleIds: string[];
+createdAt: string;
+}
+
+export interface AIConstraint {
+id: string;
+type: "DO" | "DON'T" | "PREFER" | "AVOID";
+description: string;
+reason: string;
+moduleIds: string[];
+createdAt: string;
+}
+
+export interface AIContext {
+// Project overview for AI
+projectSummary: string;
+
+// Architectural decisions with rationale
+patterns: AIPattern[];
+constraints: AIConstraint[];
+
+// Don't touch these - they work
+protectedModules: string[];
+protectedFiles: string[];
+
+// Active decisions - what we're working on
+activeDecisions: string[]; // Decision IDs
+
+// Recently completed (for AI awareness)
+recentChanges: Array<{
+what: string;
+why: string;
+when: string;
+}>;
+
+// AI notes per module
+moduleInsights: Record<string, string>; // moduleId -> AI insight
+
+// Last updated
+lastContextUpdate: string;
+}
+
+// === CORE INTERFACES ===
+
 export interface BrainModule {
-	id: string;
-	name: string;
-	description: string;
-	status: ModuleStatus;
-	progress: number;
-	locked: boolean;
-	files: string[];
-	dependsOn: string[];
-	position: {
-		x: number;
-		y: number;
-	};
-	createdAt: string;
-	updatedAt: string;
+id: string;
+name: string;
+description: string;
+status: ModuleStatus;
+progress: number;
+locked: boolean;
+files: string[];
+dependsOn: string[];
+position: { x: number; y: number };
+createdAt: string;
+updatedAt: string;
+
+// AI metadata
+aiNotes?: string;
+publicApi?: string[]; // Exported functions/classes
+dependencies?: string[]; // Internal deps
 }
 
-/**
- * BrainTask - Work items derived from proposals
- */
 export interface BrainTask {
-	id: string;
-	moduleId: string;
-	title: string;
-	description: string;
-	status: TaskStatus;
-	priority: TaskPriority;
-	createdAt: string;
-	updatedAt: string;
-	completedAt?: string;
+id: string;
+moduleId: string;
+title: string;
+description: string;
+status: TaskStatus;
+priority: TaskPriority;
+createdAt: string;
+updatedAt: string;
+completedAt?: string;
+
+// AI metadata
+aiEstimate?: string; // "2 hours", "1 day"
+aiSuggestions?: string[];
 }
 
-/**
- * BrainIdea - User-generated or AI-suggested concepts
- */
 export interface BrainIdea {
-	id: string;
-	title: string;
-	description: string;
-	moduleId?: string;
-	impact?: "LOW" | "MEDIUM" | "HIGH";
-	affectedModules: string[];
-	createdAt: string;
-	status: "OPEN" | "EVALUATING" | "IMPLEMENTED" | "REJECTED";
+id: string;
+title: string;
+description: string;
+tags: string[]; // "feature", "bug", "refactor", "research"
+moduleId?: string;
+impact?: "LOW" | "MEDIUM" | "HIGH";
+effort?: "LOW" | "MEDIUM" | "HIGH";
+affectedModules: string[];
+createdAt: string;
+status: "BACKLOG" | "TODO" | "IN_PROGRESS" | "DONE" | "ARCHIVED";
+
+// AI metadata
+aiAnalysis?: string;
+aiSuggestedModules?: string[];
 }
 
-/**
- * BrainDecision - Architectural and technical decisions
- */
 export interface BrainDecision {
-	id: string;
-	moduleId: string;
-	type: DecisionType;
-	title: string;
-	description: string;
-	reason: string;
-	createdAt: string;
-	createdBy: "USER" | "AI";
+id: string;
+moduleId: string;
+type: DecisionType;
+title: string;
+description: string;
+
+// WHY - this is crucial for AI context
+rationale: string; // Why was this decision made?
+alternatives: string[]; // What was considered instead?
+
+// Status workflow
+status: DecisionStatus;
+proposedAt: string;
+resolvedAt?: string;
+resolvedBy?: string;
+
+// Author
+createdBy: "USER" | "AI";
+authorName?: string;
+
+// Relationships
+relatedDecisionIds: string[];
+affectedModuleIds: string[];
 }
 
-/**
- * BrainRisk - Identified project risks
- */
 export interface BrainRisk {
-	id: string;
-	title: string;
-	description: string;
-	severity: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
-	moduleId?: string;
-	mitigation?: string;
-	createdAt: string;
-	status: "OPEN" | "MITIGATED" | "ACCEPTED" | "CLOSED";
+id: string;
+title: string;
+description: string;
+severity: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+moduleId?: string;
+mitigation?: string;
+createdAt: string;
+status: "OPEN" | "MITIGATED" | "ACCEPTED" | "CLOSED";
 }
 
-/**
- * BrainRoadmap - Development roadmap items
- */
 export interface BrainRoadmap {
-	id: string;
-	title: string;
-	description: string;
-	moduleId?: string;
-	taskIds: string[];
-	status: "TODO" | "IN_PROGRESS" | "DONE";
-	dependsOn: string[];
-	order: number;
-	createdAt: string;
-	updatedAt: string;
+id: string;
+title: string;
+description: string;
+moduleId?: string;
+taskIds: string[];
+status: "TODO" | "IN_PROGRESS" | "DONE";
+dependsOn: string[];
+order: number;
+createdAt: string;
+updatedAt: string;
 }
 
-/**
- * BrainHistory - Audit log of all changes
- */
 export interface BrainHistory {
-	id: string;
-	action: HistoryAction;
-	target: string;
-	targetId: string;
-	description: string;
-	timestamp: string;
+id: string;
+action: HistoryAction;
+target: string;
+targetId: string;
+description: string;
+timestamp: string;
+user?: string;
 }
 
-/**
- * BrainLink - Connections between modules
- */
 export interface BrainLink {
-	id: string;
-	sourceId: string;
-	targetId: string;
-	type: LinkType;
-	createdAt: string;
+id: string;
+sourceId: string;
+targetId: string;
+type: LinkType;
+description?: string;
+createdAt: string;
 }
 
-/**
- * Project Brain - The single source of truth
- */
+// === PROJECT BRAIN ===
+
 export interface ProjectBrain {
-	version: string;
-	projectName: string;
-	description: string;
-	rootPath: string;
-	initialized: boolean;
-	createdAt: string;
-	updatedAt: string;
+version: string;
+projectName: string;
+description: string;
+rootPath: string;
+initialized: boolean;
+createdAt: string;
+updatedAt: string;
 
-	// Core collections
-	modules: BrainModule[];
-	tasks: BrainTask[];
-	ideas: BrainIdea[];
-	decisions: BrainDecision[];
-	risks: BrainRisk[];
-	roadmap: BrainRoadmap[];
-	history: BrainHistory[];
-	links: BrainLink[];
+// AI Context - NEW!
+aiContext: AIContext;
 
-	// Project metadata
-	technologyStack: string[];
-	configFiles: string[];
+// Core collections
+modules: BrainModule[];
+tasks: BrainTask[];
+ideas: BrainIdea[];
+decisions: BrainDecision[];
+risks: BrainRisk[];
+roadmap: BrainRoadmap[];
+history: BrainHistory[];
+links: BrainLink[];
+
+// Project metadata
+technologyStack: string[];
+configFiles: string[];
 }
