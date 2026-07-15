@@ -2,882 +2,159 @@ import * as vscode from 'vscode';
 
 import { ProjectBrainProvider } from './providers/ProjectBrainProvider';
 import { KnowledgeProvider } from './providers/KnowledgeProvider';
+import { ProjectDashboardProvider } from './providers/ProjectDashboardProvider';
 
 import { initializeProject } from './commands/initializeProject';
 import { ModuleCardPanel } from './panels/ModuleCardPanel';
 import { InitializePanel } from './panels/InitializePanel';
-
-import { ProjectDashboardProvider } from './providers/ProjectDashboardProvider';
-
-import { ProjectStore } from './storage/projectStore';
-
 import { ProposalPanel } from './panels/ProposalPanel';
-
 import { addDecision } from './commands/addDecision';
-
 import { analyzeModule } from './commands/analyzeModule';
-
-import { ProjectArchitectService } from './services/ProjectArchitectService';
 import { analyzeProject } from './commands/analyzeProject';
-import { AnalysisParser } from './ai/AnalysisParser';
 
+import { BrainStore } from './storage/BrainStore';
 
+export function activate(context: vscode.ExtensionContext) {
+console.log('🧠 Project Brain activated');
 
+const provider = new ProjectBrainProvider();
+const dashboardProvider = new ProjectDashboardProvider();
+const knowledgeProvider = new KnowledgeProvider();
 
-
-
-
-export function activate(
-
-	context:vscode.ExtensionContext
-
-){
-
-
-
-	console.log(
-
-		'🧠 Project Brain activated'
-
-	);
-
-
-
-
-
-
-	const provider =
-
-	new ProjectBrainProvider();
-
-
-
-
-
-	const dashboardProvider =
-
-	new ProjectDashboardProvider();
-
-
-
-
-
-	const knowledgeProvider =
-
-	new KnowledgeProvider();
-
-
-
-
-
-
-
-	context.subscriptions.push(
-
-
-
-		vscode.window.registerTreeDataProvider(
-
-
-			'projectBrainView',
-
-
-			provider
-
-
-		)
-
-
-
-	);
-
-
-
-
-	context.subscriptions.push(
-
-	vscode.commands.registerCommand(
-
-		"project-brain.analyzeProject",
-
-		async()=>{
-
-
-			await analyzeProject();
-
-
-			provider.refresh();
-
-			dashboardProvider.refresh();
-
-
-		}
-
-	)
-
+// Register Tree Views
+context.subscriptions.push(
+vscode.window.registerTreeDataProvider('projectBrainView', provider)
 );
 
-
-	context.subscriptions.push(
-
-
-
-		vscode.window.registerTreeDataProvider(
-
-
-			'projectBrainDashboard',
-
-
-			dashboardProvider
-
-
-		)
-
-
-
-	);
-
-
-
-
-
-
-
-	context.subscriptions.push(
-
-
-
-		vscode.window.registerTreeDataProvider(
-
-
-			'projectBrainKnowledgeView',
-
-
-			knowledgeProvider
-
-
-		)
-
-
-
-	);
-
-
-
-
-
-
-
-
-
-	// OPEN INITIALIZE WIZARD
-
-
-	context.subscriptions.push(
-
-
-		vscode.commands.registerCommand(
-
-
-			'project-brain.createProject',
-
-
-			()=>{
-
-
-				InitializePanel.createOrShow();
-
-
-			}
-
-
-		)
-
-
-	);
-
-
-
-
-
-
-
-
-
-	// INITIALIZE RESULT
-
-
-	context.subscriptions.push(
-
-
-		vscode.commands.registerCommand(
-
-
-			'project-brain.initializeWizardSubmit',
-
-
-			async(data)=>{
-
-
-
-				console.log(
-
-					"Initialize data:",
-
-					data
-
-				);
-
-
-
-
-
-				initializeProject();
-
-
-
-
-
-				provider.refresh();
-
-
-				dashboardProvider.refresh();
-
-
-				knowledgeProvider.refresh();
-
-
-
-
-
-				vscode.window.showInformationMessage(
-
-
-					"🧠 Project Brain initialized"
-
-
-				);
-
-
-
-			}
-
-
-		)
-
-
-	);
-
-
-
-
-
-
-
-
-
-	// ANALYZE PROJECT WITH AI
-
-
-	context.subscriptions.push(
-
-
-		vscode.commands.registerCommand(
-
-
-			"project-brain.analyzeProject",
-
-
-			async()=>{
-
-
-				try {
-
-
-
-					const service =
-
-					new ProjectArchitectService();
-
-
-
-
-
-
-					const result =
-
-					await service.analyzeProject();
-
-
-
-
-
-
-					const analysis =
-
-AnalysisParser.parse(
-
-	result.result.content
-
+context.subscriptions.push(
+vscode.window.registerTreeDataProvider('projectBrainDashboard', dashboardProvider)
 );
 
-
-
-console.log(
-	"===== AI RAW RESPONSE ====="
+context.subscriptions.push(
+vscode.window.registerTreeDataProvider('projectBrainKnowledgeView', knowledgeProvider)
 );
 
-
-console.log(
-	result.result.content
+// Initialize Project
+context.subscriptions.push(
+vscode.commands.registerCommand('project-brain.createProject', () => {
+InitializePanel.createOrShow();
+})
 );
 
-
-console.log(
-	"===== PARSED MODULES ====="
+// Initialize Result
+context.subscriptions.push(
+vscode.commands.registerCommand('project-brain.initializeWizardSubmit', async (data) => {
+console.log("Initialize data:", data);
+initializeProject();
+provider.refresh();
+dashboardProvider.refresh();
+knowledgeProvider.refresh();
+vscode.window.showInformationMessage("🧠 Project Brain initialized");
+})
 );
 
-
-console.log(
-	analysis.modules
+// Analyze Project - SINGLE REGISTRATION
+context.subscriptions.push(
+vscode.commands.registerCommand('project-brain.analyzeProject', async () => {
+try {
+await analyzeProject();
+provider.refresh();
+dashboardProvider.refresh();
+} catch (error) {
+vscode.window.showErrorMessage("Analysis error: " + String(error));
+}
+})
 );
 
+// Open Module
+context.subscriptions.push(
+vscode.commands.registerCommand('project-brain.openModule', (module) => {
+try {
+const store = new BrainStore();
+ModuleCardPanel.createOrShow(module);
+} catch {
+ModuleCardPanel.createOrShow(module);
+}
+})
+);
 
+// Update Module
+context.subscriptions.push(
+vscode.commands.registerCommand('project-brain.updateModule', (module) => {
+try {
+const store = new BrainStore();
+store.updateModule(module.id, module);
+provider.refresh();
+dashboardProvider.refresh();
+vscode.window.showInformationMessage("✅ Module updated");
+} catch (error) {
+vscode.window.showErrorMessage("Update error: " + String(error));
+}
+})
+);
 
+// Add Decision
+context.subscriptions.push(
+vscode.commands.registerCommand('project-brain.addDecision', (moduleId) => {
+addDecision(moduleId);
+})
+);
 
+// Add Idea
+context.subscriptions.push(
+vscode.commands.registerCommand('project-brain.addIdea', async () => {
+const title = await vscode.window.showInputBox({
+prompt: "Enter idea title",
+placeHolder: "My great idea"
+});
+if (title) {
+try {
+const store = new BrainStore();
+store.addIdea({
+title,
+description: "",
+affectedModules: [],
+status: "OPEN"
+});
+dashboardProvider.refresh();
+vscode.window.showInformationMessage("💡 Idea added");
+} catch (error) {
+vscode.window.showErrorMessage("Error: " + String(error));
+}
+}
+})
+);
 
+// Analyze Module
+context.subscriptions.push(
+vscode.commands.registerCommand('project-brain.analyzeModule', async (moduleId) => {
+await analyzeModule(moduleId);
+provider.refresh();
+})
+);
 
+// Open Proposal
+context.subscriptions.push(
+vscode.commands.registerCommand('project-brain.openProposal', (proposal) => {
+ProposalPanel.createOrShow(proposal);
+})
+);
 
-					const panel =
+// Open Map
+context.subscriptions.push(
+vscode.commands.registerCommand('project-brain.openMap', () => {
+vscode.window.showInformationMessage('🗺 Architecture Map coming soon');
+})
+);
 
-					vscode.window.createWebviewPanel(
+// Refresh commands
+context.subscriptions.push(
+vscode.commands.registerCommand('projectBrainView.refresh', () => provider.refresh())
+);
 
-
-						"projectBrainAIProject",
-
-
-						"🤖 Project Architecture Analysis",
-
-
-						vscode.ViewColumn.Two,
-
-
-						{
-
-
-							enableScripts:true
-
-
-						}
-
-
-					);
-
-
-
-
-
-
-
-					panel.webview.html = `
-
-
-
-<html>
-
-<body style="font-family:Arial;padding:20px">
-
-
-<h1>
-
-🤖 Project Brain Analysis
-
-</h1>
-
-
-
-
-<h2>
-
-🔍 Scan
-
-</h2>
-
-
-<p>
-
-Files:
-${result.scan.files.length}
-
-</p>
-
-
-
-<p>
-
-Technologies:
-
-${
-
-result.scan.technologies.join(", ")
-
+context.subscriptions.push(
+vscode.commands.registerCommand('projectBrainDashboard.refresh', () => dashboardProvider.refresh())
+);
 }
 
-</p>
-
-
-
-
-<hr>
-
-
-
-
-
-<h2>
-
-🧩 Modules
-
-</h2>
-
-
-
-<pre style="white-space:pre-wrap">
-
-
-${
-
-analysis.modules
-
-.map(
-
-m =>
-
-
-`${m.name}
-
-
-${m.description}
-
-
-Status:
-
-${m.status}`
-
-
-)
-
-.join("\n\n")
-
-}
-
-
-
-</pre>
-
-
-
-
-
-
-
-<h2>
-
-⚠️ Risks
-
-</h2>
-
-
-
-<pre style="white-space:pre-wrap">
-
-
-${
-
-analysis.risks.join("\n")
-
-}
-
-
-</pre>
-
-
-
-
-
-
-
-<h2>
-
-💡 Suggestions
-
-</h2>
-
-
-
-<pre style="white-space:pre-wrap">
-
-
-${
-
-analysis.recommendations.join("\n")
-
-}
-
-
-</pre>
-
-
-
-
-
-
-
-</body>
-
-</html>
-
-
-`;
-
-
-
-
-
-				}
-
-				catch(error){
-
-
-
-					vscode.window.showErrorMessage(
-
-
-						"Project analysis error: " + error
-
-
-					);
-
-
-
-				}
-
-
-
-			}
-
-
-		)
-
-
-	);
-
-
-
-
-
-
-
-
-
-	context.subscriptions.push(
-
-
-		vscode.commands.registerCommand(
-
-
-			'project-brain.openModule',
-
-
-			(module)=>{
-
-
-
-				const store =
-
-				new ProjectStore();
-
-
-
-
-
-				const history =
-
-				store.loadHistory();
-
-
-
-
-
-				const decisions =
-
-				store.loadDecisions();
-
-
-
-
-
-
-
-				ModuleCardPanel.createOrShow(
-
-
-					module,
-
-
-					history,
-
-
-					decisions
-
-
-				);
-
-
-
-			}
-
-
-		)
-
-
-	);
-
-
-
-
-
-
-
-
-
-	context.subscriptions.push(
-
-
-		vscode.commands.registerCommand(
-
-
-			'project-brain.updateModule',
-
-
-			(module)=>{
-
-
-
-				const store =
-
-				new ProjectStore();
-
-
-
-
-
-				store.updateModule(
-
-
-					module
-
-
-				);
-
-
-
-
-
-				provider.refresh();
-
-
-
-
-
-				vscode.window.showInformationMessage(
-
-
-					"✅ Module updated"
-
-
-				);
-
-
-
-			}
-
-
-		)
-
-
-	);
-
-
-
-
-
-
-
-
-
-	context.subscriptions.push(
-
-
-		vscode.commands.registerCommand(
-
-
-			"project-brain.addDecision",
-
-
-			(moduleId)=>{
-
-
-
-				addDecision(
-
-					moduleId
-
-				);
-
-
-
-			}
-
-
-		)
-
-
-	);
-
-
-
-
-
-
-
-
-
-	context.subscriptions.push(
-
-
-		vscode.commands.registerCommand(
-
-
-			"project-brain.analyzeModule",
-
-
-			async(moduleId)=>{
-
-
-
-				await analyzeModule(
-
-
-					moduleId
-
-
-				);
-
-
-
-				provider.refresh();
-
-
-
-			}
-
-
-		)
-
-
-	);
-
-
-
-
-
-
-
-
-
-	context.subscriptions.push(
-
-
-		vscode.commands.registerCommand(
-
-
-			"project-brain.openProposal",
-
-
-			(proposal)=>{
-
-
-
-				ProposalPanel.createOrShow(
-
-
-					proposal
-
-
-				);
-
-
-
-			}
-
-
-		)
-
-
-	);
-
-
-
-
-
-
-
-
-
-	context.subscriptions.push(
-
-
-		vscode.commands.registerCommand(
-
-
-			'project-brain.openMap',
-
-
-			()=>{
-
-
-
-				vscode.window.showInformationMessage(
-
-
-					'🗺 Architecture Map coming soon'
-
-
-				);
-
-
-
-			}
-
-
-		)
-
-
-	);
-
-
-
-
-
-}
-
-
-
-
-
-
-
-export function deactivate(){
-
-}
+export function deactivate() {}

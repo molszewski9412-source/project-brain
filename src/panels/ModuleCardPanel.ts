@@ -1,767 +1,107 @@
 import * as vscode from 'vscode';
 import { ProjectModule } from '../models/Module';
-import { HistoryEntry } from '../models/History';
-import { ProjectDecision } from '../models/Decision';
-
-
+import { BrainStore } from '../storage/BrainStore';
 
 export class ModuleCardPanel {
-
-
-
-	public static currentPanel:
-	ModuleCardPanel | undefined;
-
-
-
-	private readonly panel:
-	vscode.WebviewPanel;
-
-
-
-	private constructor(
-
-		panel:vscode.WebviewPanel,
-
-		module:ProjectModule,
-
-		history:HistoryEntry[],
-
-		decisions:ProjectDecision[]
-
-	){
-
-
-		this.panel = panel;
-
-
-		this.update(
-
-			module,
-
-			history,
-
-			decisions
-
-		);
-
-
-
-
-		this.panel.onDidDispose(()=>{
-
-
-			ModuleCardPanel.currentPanel =
-			undefined;
-
-
-		});
-
-
-
-
-
-
-		this.panel.webview.onDidReceiveMessage(
-
-			message => {
-
-
-
-				if(message.command === "save"){
-
-
-
-					vscode.commands.executeCommand(
-
-						"project-brain.updateModule",
-
-						message.module
-
-					);
-
-
-				}
-
-
-
-
-				if(message.command === "addDecision"){
-
-
-
-					vscode.commands.executeCommand(
-
-						"project-brain.addDecision",
-
-						module.id
-
-					);
-
-
-				}
-
-                if(message.command === "analyze"){
-
-
-	                vscode.commands.executeCommand(
-
-		                "project-brain.analyzeModule",
-
-	                	module.id
-
-	                );
-
-
-                }
-
-
-			}
-
-		);
-
-
-
-	}
-
-
-
-
-
-
-
-
-	public static createOrShow(
-
-		module:ProjectModule,
-
-		history:HistoryEntry[],
-
-		decisions:ProjectDecision[]
-
-	){
-
-
-
-		const column =
-
-		vscode.ViewColumn.One;
-
-
-
-
-
-
-		if(ModuleCardPanel.currentPanel){
-
-
-
-			ModuleCardPanel.currentPanel.panel.reveal(
-
-				column
-
-			);
-
-
-
-			ModuleCardPanel.currentPanel.update(
-
-				module,
-
-				history,
-
-				decisions
-
-			);
-
-
-
-			return;
-
-		}
-
-
-
-
-
-
-		const panel =
-
-		vscode.window.createWebviewPanel(
-
-			"projectBrainModule",
-
-			`🧠 ${module.name}`,
-
-			column,
-
-			{
-
-				enableScripts:true
-
-			}
-
-		);
-
-
-
-
-
-
-
-		ModuleCardPanel.currentPanel =
-
-		new ModuleCardPanel(
-
-			panel,
-
-			module,
-
-			history,
-
-			decisions
-
-		);
-
-
-
-	}
-
-
-
-
-
-
-
-
-
-	private update(
-
-		module:ProjectModule,
-
-		history:HistoryEntry[],
-
-		decisions:ProjectDecision[]
-
-	){
-
-
-		this.panel.webview.html =
-
-		this.getHtml(
-
-			module,
-
-			history,
-
-			decisions
-
-		);
-
-
-	}
-
-
-
-
-
-
-
-
-
-	private getHtml(
-
-		module:ProjectModule,
-
-		history:HistoryEntry[],
-
-		decisions:ProjectDecision[]
-
-	):string {
-
-
-
-		const historyHtml =
-
-
-
-		history
-
-		.filter(
-
-			h => h.target === module.id
-
-		)
-
-		.reverse()
-
-		.map(
-
-			h => `
-
-
-<div class="history-item">
-
-<b>${h.action}</b>
-
-<br>
-
-${h.description}
-
-<br>
-
-<small>
-
-${new Date(h.timestamp).toLocaleString()}
-
-</small>
-
-</div>
-
-
-`
-
-		)
-
-		.join("")
-
-		||
-
-		"<i>No history yet</i>";
-
-
-
-
-
-
-
-		const decisionHtml =
-
-
-
-		decisions
-
-		.filter(
-
-			d => d.moduleId === module.id
-
-		)
-
-		.reverse()
-
-		.map(
-
-			d => `
-
-
-<div class="decision-item">
-
-
-<b>
-
-${d.type}
-
-</b>
-
-
-<br>
-
-
-${d.title}
-
-
-<br>
-
-
-${d.description}
-
-
-<br>
-
-
-<strong>
-Reason:
-</strong>
-
-${d.reason}
-
-
-<br>
-
-
-<small>
-
-${new Date(d.createdAt).toLocaleString()}
-
-</small>
-
-
-</div>
-
-
-`
-
-		)
-
-		.join("")
-
-		||
-
-		"<i>No decisions yet</i>";
-
-
-
-
-
-
-
-
-
-		return `
-
-
+public static currentPanel: ModuleCardPanel | undefined;
+private readonly panel: vscode.WebviewPanel;
+private module: ProjectModule;
+
+private constructor(
+panel: vscode.WebviewPanel,
+module: ProjectModule
+) {
+this.panel = panel;
+this.module = module;
+this.update();
+}
+
+public static createOrShow(module: ProjectModule): ModuleCardPanel {
+const column = vscode.window.activeTextEditor
+? vscode.window.activeTextEditor.viewColumn
+: undefined;
+
+if (ModuleCardPanel.currentPanel) {
+ModuleCardPanel.currentPanel.reveal(column, true);
+ModuleCardPanel.currentPanel.dispose();
+}
+
+const panel = vscode.window.createWebviewPanel(
+'moduleCard',
+`📦 ${module.name}`,
+column || vscode.ViewColumn.One,
+{ enableScripts: true }
+);
+
+ModuleCardPanel.currentPanel = new ModuleCardPanel(panel, module);
+return ModuleCardPanel.currentPanel;
+}
+
+private update(): void {
+const store = new BrainStore();
+const history = store.getHistory().filter(h => h.targetId === this.module.id);
+const decisions = store.getDecisions().filter(d => d.moduleId === this.module.id);
+
+this.panel.webview.html = `
 <!DOCTYPE html>
-
 <html>
-
-
 <head>
-
-
 <style>
-
-
-body{
-
-font-family:Arial;
-
-padding:20px;
-
-}
-
-
-
-.card{
-
-border:1px solid #555;
-
-border-radius:12px;
-
-padding:20px;
-
-}
-
-
-
-input,textarea,select{
-
-width:100%;
-
-margin-bottom:12px;
-
-padding:8px;
-
-}
-
-
-
-button{
-
-padding:10px 20px;
-
-cursor:pointer;
-
-}
-
-
-
-.section{
-
-margin-top:30px;
-
-}
-
-
-
-.history-item,
-.decision-item{
-
-border-left:3px solid #777;
-
-padding:10px;
-
-margin-bottom:10px;
-
-}
-
-
-
+body { font-family: Arial, sans-serif; padding: 20px; background: #1e1e1e; color: #ccc; }
+h1 { color: #fff; border-bottom: 2px solid #007acc; padding-bottom: 10px; }
+.status { display: inline-block; padding: 5px 10px; border-radius: 5px; font-size: 12px; margin: 5px 0; }
+.status-idea { background: #4a4a00; color: #ffd700; }
+.status-planned { background: #004d4d; color: #00d4ff; }
+.status-in_progress { background: #006600; color: #00ff00; }
+.status-review { background: #660066; color: #ff00ff; }
+.status-done { background: #004d00; color: #00ff00; }
+.status-locked { background: #4d0000; color: #ff6b6b; }
+.progress-bar { background: #333; border-radius: 5px; height: 20px; margin: 10px 0; }
+.progress-fill { background: #007acc; border-radius: 5px; height: 20px; }
+.section { background: #2d2d2d; padding: 15px; margin: 10px 0; border-radius: 8px; }
+.section h3 { margin-top: 0; color: #fff; }
+.history-item, .decision-item { padding: 5px 0; border-bottom: 1px solid #444; }
+.empty { color: #888; font-style: italic; }
 </style>
-
-
 </head>
-
-
 <body>
-
-
-
-<div class="card">
-
-
-<h1>
-
-🧠 ${module.name}
-
-</h1>
-
-
-
-
-<label>Status</label>
-
-
-<select id="status">
-
-
-${
-
-[
-"IDEA",
-"PLANNED",
-"IN_PROGRESS",
-"REVIEW",
-"DONE",
-"LOCKED",
-"ARCHIVED"
-
-]
-
-.map(
-
-s =>
-
-`
-
-<option ${module.status===s?"selected":""}>
-
-${s}
-
-</option>
-
-`
-
-)
-
-.join("")
-
-}
-
-
-</select>
-
-
-
-
-<label>Progress</label>
-
-
-<input
-
-id="progress"
-
-type="number"
-
-value="${module.progress}"
-
->
-
-
-
-
-<label>Description</label>
-
-
-<textarea id="description">
-
-${module.description}
-
-</textarea>
-
-
-
-
-
-<button onclick="save()">
-
-💾 SAVE
-
-</button>
-
-
-
-
-
+<h1>📦 ${this.module.name}</h1>
+<span class="status status-${this.module.status.toLowerCase()}">${this.module.status}</span>
+<div class="progress-bar">
+<div class="progress-fill" style="width: ${this.module.progress}%"></div>
+</div>
+<p>Progress: ${this.module.progress}%</p>
 <div class="section">
-
-
-<h2>
-
-📜 History
-
-</h2>
-
-
-${historyHtml}
-
-
+<h3>📝 Description</h3>
+<p>${this.module.description || '<span class="empty">No description</span>'}</p>
 </div>
-
-
-
-
-
-
-
 <div class="section">
-
-
-<h2>
-
-🧩 Decisions
-
-</h2>
-
-
-
-${decisionHtml}
-
-
-
-<br>
-
-
-<button onclick="addDecision()">
-
-➕ Add Decision
-
-</button>
-
-<br><br>
-
-
-<button onclick="analyze()">
-
-🤖 Analyze Module
-
-</button>
-
+<h3>📁 Files</h3>
+${this.module.files.length > 0 
+? this.module.files.map(f => `<p>${f}</p>`).join('') 
+: '<p class="empty">No files linked</p>'}
 </div>
-
-
-
+<div class="section">
+<h3>📋 History</h3>
+${history.length > 0 
+? history.map(h => `<div class="history-item"><strong>${h.action}</strong>: ${h.description} <small>(${new Date(h.timestamp).toLocaleString()})</small></div>`).join('')
+: '<p class="empty">No history</p>'}
 </div>
-
-
-
-
-
-
-
-
-<script>
-
-
-const vscode = acquireVsCodeApi();
-
-
-
-
-function save(){
-
-
-
-vscode.postMessage({
-
-command:"save",
-
-
-module:{
-
-
-...${JSON.stringify(module)},
-
-
-status:
-
-document.getElementById("status").value,
-
-
-progress:
-
-Number(
-
-document.getElementById("progress").value
-
-),
-
-
-description:
-
-document.getElementById("description").value
-
-
-}
-
-
-});
-
-
-}
-
-
-
-
-
-function addDecision(){
-
-
-vscode.postMessage({
-
-command:"addDecision"
-
-
-});
-
-
-}
-
-function analyze(){
-
-
-vscode.postMessage({
-
-command:"analyze"
-
-
-});
-
-
-}
-
-</script>
-
-
-
+<div class="section">
+<h3>🏛️ Decisions</h3>
+${decisions.length > 0 
+? decisions.map(d => `<div class="decision-item"><strong>${d.title}</strong><br><small>${d.description}</small></div>`).join('')
+: '<p class="empty">No decisions</p>'}
+</div>
 </body>
+</html>`;
+}
 
-</html>
+private reveal(column?: vscode.ViewColumn, preserveFocus?: boolean): void {
+this.panel.reveal(column, preserveFocus);
+}
 
-
-`;
-
-	}
-
-
-
+private dispose(): void {
+ModuleCardPanel.currentPanel = undefined;
+}
 }
