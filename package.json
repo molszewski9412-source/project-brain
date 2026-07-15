@@ -86,10 +86,51 @@
         "title": "Project Brain: Open Proposal"
       }
 
-    ]
+    ],
+
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "project-brain.createProject",
+          "when": "true"
+        },
+        {
+          "command": "project-brain.analyzeProject",
+          "when": "true"
+        },
+        {
+          "command": "project-brain.openKanban",
+          "when": "true"
+        },
+        {
+          "command": "project-brain.openMap",
+          "when": "true"
+        },
+        {
+          "command": "project-brain.addDecision",
+          "when": "true"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "project-brain.analyzeProject",
+          "when": "view == projectBrainView",
+          "group": "navigation"
+        },
+        {
+          "command": "project-brain.openKanban",
+          "when": "view == projectBrainView",
+          "group": "navigation"
+        },
+        {
+          "command": "projectBrainView.refresh",
+          "when": "view == projectBrainView",
+          "group": "navigation"
+        }
+      ]
+    }
 
   },
-
 
   "scripts": {
 
