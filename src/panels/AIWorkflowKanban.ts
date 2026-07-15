@@ -50,6 +50,9 @@ export class AIWorkflowKanban {
                 case "addCard":
                     this.addCard(msg.status);
                     break;
+                case "submitAddCard":
+                    this.handleAddCardSubmit(msg.title, msg.description, msg.status);
+                    break;
                 case "moveCard":
                     await this.handleMoveCard(msg.cardId, msg.fromStatus, msg.toStatus);
                     break;
@@ -154,15 +157,24 @@ export class AIWorkflowKanban {
     }
 
     private addCard(status: string): void {
-        vscode.window.showInputBox({ prompt: "Idea title:" }).then(title => {
-            if (!title) return;
-            vscode.window.showInputBox({ prompt: "Description:", value: "" }).then(desc => {
-                this.store.addIdea({
-                    title, description: desc || "", tags: [], affectedModules: [], status: status as any
-                });
-                this.update();
-            });
+        // Send to webview to show input modal
+        this.panel.webview.postMessage({ 
+            command: "showAddCardModal", 
+            status: status 
         });
+    }
+
+    public handleAddCardSubmit(title: string, description: string, status: string): void {
+        if (title && title.trim()) {
+            this.store.addIdea({
+                title: title.trim(),
+                description: description || "",
+                tags: [],
+                affectedModules: [],
+                status: status as any
+            });
+            this.update();
+        }
     }
 
     private buildHtml(): string {
@@ -246,6 +258,26 @@ h1{color:#00d4ff}
         }
 
         html += `</div>
+
+<!-- Add Card Modal -->
+<div class="modal" id="addCardModal">
+    <div class="modal-content">
+        <div class="modal-header"><span class="modal-title">Add New Idea</span><span class="modal-close" onclick="closeAddModal()">x</span></div>
+        <div style="margin: 15px 0">
+            <label style="display:block;margin-bottom:5px;color:#888">Title:</label>
+            <input type="text" id="cardTitle" style="width:100%;padding:10px;border-radius:6px;border:1px solid #333;background:#16213e;color:#fff" placeholder="What do you want to build?">
+        </div>
+        <div style="margin: 15px 0">
+            <label style="display:block;margin-bottom:5px;color:#888">Description (optional):</label>
+            <textarea id="cardDesc" style="width:100%;padding:10px;border-radius:6px;border:1px solid #333;background:#16213e;color:#fff;min-height:80px" placeholder="More details..."></textarea>
+        </div>
+        <div class="modal-actions">
+            <button class="modal-btn ok" onclick="submitAddCard()">Add Idea</button>
+            <button class="modal-btn close" onclick="closeAddModal()">Cancel</button>
+        </div>
+    </div>
+</div>
+
 <div class="modal" id="analysisModal">
     <div class="modal-content">
         <div class="modal-header"><span class="modal-title">AI Analysis</span><span class="modal-close" onclick="closeModal()">x</span></div>
@@ -256,18 +288,25 @@ h1{color:#00d4ff}
 <script>
 const vscode=acquireVsCodeApi();
 let currentCard=null;
+let pendingStatus=null;
+
 document.addEventListener('dragstart',e=>{if(e.target.classList.contains('card')){e.target.classList.add('dragging');currentCard={id:e.target.dataset.id,from:e.target.dataset.status}}});
 document.addEventListener('dragend',e=>{if(e.target.classList.contains('card'))e.target.classList.remove('dragging')});
 document.addEventListener('dragover',e=>e.preventDefault());
 document.addEventListener('drop',e=>{e.preventDefault();const col=e.target.closest('.column');if(col&&currentCard){const to=col.dataset.status;vscode.postMessage({command:'moveCard',cardId:currentCard.id,fromStatus:currentCard.from,toStatus:to})}currentCard=null});
-function addCard(s){vscode.postMessage({command:'addCard',status:s})}
+
+function addCard(status){pendingStatus=status;document.getElementById('addCardModal').classList.add('show');document.getElementById('cardTitle').focus()}
+function closeAddModal(){document.getElementById('addCardModal').classList.remove('show');document.getElementById('cardTitle').value='';document.getElementById('cardDesc').value='';pendingStatus=null}
+function submitAddCard(){const t=document.getElementById('cardTitle').value.trim();const d=document.getElementById('cardDesc').value.trim();if(t&&pendingStatus){vscode.postMessage({command:'submitAddCard',title:t,description:d,status:pendingStatus})}closeAddModal()}
 function deleteCard(id){if(confirm('Delete?'))vscode.postMessage({command:'deleteCard',cardId:id})}
 function askAI(id){vscode.postMessage({command:'askAI',cardId:id})}
 function closeModal(){document.getElementById('analysisModal').classList.remove('show')}
+
 window.addEventListener('message',e=>{
 const m=e.data;
 if(m.command==='showAnalysis'){document.getElementById('modalBody').textContent=m.analysis;document.getElementById('analysisModal').classList.add('show')}
 if(m.command==='showInsight')alert(m.content.substring(0,500))
+if(m.command==='showAddCardModal'){pendingStatus=m.status;document.getElementById('addCardModal').classList.add('show');document.getElementById('cardTitle').focus()}
 });
 </script></body></html>`;
 
