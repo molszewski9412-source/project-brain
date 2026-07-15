@@ -9,6 +9,7 @@ import { ModuleCardPanel } from './panels/ModuleCardPanel';
 import { InitializePanel } from './panels/InitializePanel';
 import { ProposalPanel } from './panels/ProposalPanel';
 import { KanbanPanel } from './panels/KanbanPanel';
+import { AIWorkflowKanban } from './panels/AIWorkflowKanban';
 import { addDecision } from './commands/addDecision';
 import { analyzeModule } from './commands/analyzeModule';
 import { analyzeProject } from './commands/analyzeProject';
@@ -161,6 +162,13 @@ vscode.commands.registerCommand('projectBrainDashboard.refresh', () => dashboard
 context.subscriptions.push(
 vscode.commands.registerCommand('project-brain.openKanban', () => {
 KanbanPanel.createOrShow();
+})
+);
+
+// Open AI Workflow Kanban (Smart workflow)
+context.subscriptions.push(
+vscode.commands.registerCommand('project-brain.openAIWorkflow', () => {
+AIWorkflowKanban.createOrShow();
 })
 );
 

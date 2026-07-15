@@ -86,6 +86,10 @@
         "command": "project-brain.openKanban",
         "title": "Project Brain: Open Kanban Board"
       },
+      {
+        "command": "project-brain.openAIWorkflow",
+        "title": "Project Brain: AI Workflow Kanban"
+      },
 
       {
         "command": "project-brain.openProposal",
