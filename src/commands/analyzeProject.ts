@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 import { ProjectScanner } from "../services/ProjectScanner";
 import { OllamaClient } from "../ai/OllamaClient";
 import { ProjectArchitectPrompt } from "../ai/ProjectArchitectPrompt";
-import { JSONResponseParser } from "../ai/JSONResponseParser";
+import { JSONResponseParser as UniversalAIResponseParser } from "../ai/JSONResponseParser";
 import { BrainStore } from "../storage/BrainStore";
 import { ArchitectureProposalPanel, ModuleProposal } from "../panels/ArchitectureProposalPanel";
 
@@ -42,7 +42,7 @@ vscode.window.showErrorMessage("Project analysis failed: " + result.error);
 return;
 }
 
-const parsed = JSONResponseParser.parse(result.content);
+const parsed = UniversalAIResponseParser.parse(result.content);
 
 console.log("=== PARSED ===");
 console.log("Modules:", parsed.modules.length);
