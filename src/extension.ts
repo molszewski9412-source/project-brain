@@ -29,6 +29,21 @@ export function activate(context: vscode.ExtensionContext) {
         })
     );
 
+    // Initialize Wizard Submit
+    context.subscriptions.push(
+        vscode.commands.registerCommand('project-brain.initializeWizardSubmit', async (data: { mode: string; description: string }) => {
+            try {
+                const store = new BrainStore();
+                const projectName = vscode.workspace.name || 'My Project';
+                store.initialize(projectName, data.description || '');
+                vscode.window.showInformationMessage("✅ Project Brain initialized!");
+                provider.refresh();
+            } catch (error) {
+                vscode.window.showErrorMessage("Initialization error: " + String(error));
+            }
+        })
+    );
+
     // Analyze Project
     context.subscriptions.push(
         vscode.commands.registerCommand('project-brain.analyzeProject', async () => {

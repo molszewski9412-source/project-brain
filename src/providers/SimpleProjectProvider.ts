@@ -31,9 +31,23 @@ export class SimpleProjectProvider implements vscode.TreeDataProvider<vscode.Tre
     private getRootItems(): Thenable<vscode.TreeItem[]> {
         const stats = this.store.getStats();
         const modules = this.store.getModules();
+        const isInitialized = this.store.isInitialized();
         
         const items: vscode.TreeItem[] = [];
         
+        // === NOT INITIALIZED ===
+        if (!isInitialized) {
+            const init = new vscode.TreeItem('🚀 Initialize Project');
+            init.contextValue = 'action';
+            init.command = { command: 'project-brain.createProject', title: 'Initialize' };
+            items.push(init);
+
+            const hint = new vscode.TreeItem('   Click above to start');
+            hint.contextValue = 'hint';
+            items.push(hint);
+            return Promise.resolve(items);
+        }
+
         // === MAIN ACTIONS ===
         const analyze = new vscode.TreeItem('🔄 Analyze Project');
         analyze.contextValue = 'action';
@@ -46,7 +60,7 @@ export class SimpleProjectProvider implements vscode.TreeDataProvider<vscode.Tre
         items.push(kanban);
 
         // === SUMMARY ===
-        const summary = new vscode.TreeItem(`📊 Summary: ${modules.length} modules | ${stats.ideas} ideas`);
+        const summary = new vscode.TreeItem(`📊 ${modules.length} modules | ${stats.ideas} ideas`);
         summary.contextValue = 'info';
         items.push(summary);
 
