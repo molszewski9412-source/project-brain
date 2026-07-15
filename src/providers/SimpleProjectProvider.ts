@@ -34,55 +34,39 @@ export class SimpleProjectProvider implements vscode.TreeDataProvider<vscode.Tre
         
         const items: vscode.TreeItem[] = [];
         
-        // Quick Actions with commands
+        // === MAIN ACTIONS ===
         const analyze = new vscode.TreeItem('🔄 Analyze Project');
         analyze.contextValue = 'action';
         analyze.command = { command: 'project-brain.analyzeProject', title: 'Analyze' };
         items.push(analyze);
 
-        const kanban = new vscode.TreeItem('📋 Open Kanban');
+        const kanban = new vscode.TreeItem('📋 AI Workflow Kanban');
         kanban.contextValue = 'action';
         kanban.command = { command: 'project-brain.openKanban', title: 'Open Kanban' };
         items.push(kanban);
 
-        // Modules
-        const modulesItem = new vscode.TreeItem(`🗺️ Modules (${modules.length})`);
-        modulesItem.collapsibleState = vscode.TreeItemCollapsibleState.Expanded;
-        modulesItem.contextValue = 'section';
-        items.push(modulesItem);
+        // === SUMMARY ===
+        const summary = new vscode.TreeItem(`📊 Summary: ${modules.length} modules | ${stats.ideas} ideas`);
+        summary.contextValue = 'info';
+        items.push(summary);
 
-        if (modules.length === 0) {
-            const empty = new vscode.TreeItem('  No modules yet - run Analyze Project');
-            empty.contextValue = 'hint';
-            items.push(empty);
-        } else {
-            for (const m of modules.slice(0, 8)) {
+        // === MODULES (if any) ===
+        if (modules.length > 0) {
+            const modulesItem = new vscode.TreeItem(`🗺️ Modules`);
+            modulesItem.collapsibleState = vscode.TreeItemCollapsibleState.Expanded;
+            modulesItem.contextValue = 'section';
+            items.push(modulesItem);
+
+            for (const m of modules.slice(0, 5)) {
                 const icon = this.getStatusIcon(m.status);
                 const mod = new vscode.TreeItem(`${icon} ${m.name}`);
                 mod.contextValue = 'module';
                 mod.id = m.id;
-                mod.description = `${m.progress}%`;
+                mod.description = m.status;
+                mod.command = { command: 'project-brain.openModule', title: 'View', arguments: [m] };
                 items.push(mod);
             }
         }
-
-        // Ideas
-        const ideasItem = new vscode.TreeItem(`📋 Ideas (${stats.ideas})`);
-        ideasItem.collapsibleState = vscode.TreeItemCollapsibleState.Collapsed;
-        ideasItem.contextValue = 'section';
-        items.push(ideasItem);
-
-        // Decisions
-        const decisionsItem = new vscode.TreeItem(`📝 Decisions (${stats.decisions})`);
-        decisionsItem.collapsibleState = vscode.TreeItemCollapsibleState.Collapsed;
-        decisionsItem.contextValue = 'section';
-        items.push(decisionsItem);
-
-        // Risks
-        const risksItem = new vscode.TreeItem(`⚠️ Risks (${stats.openRisks})`);
-        risksItem.collapsibleState = vscode.TreeItemCollapsibleState.Collapsed;
-        risksItem.contextValue = 'section';
-        items.push(risksItem);
 
         return Promise.resolve(items);
     }

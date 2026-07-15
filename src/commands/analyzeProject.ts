@@ -2,102 +2,92 @@ import * as vscode from "vscode";
 import { ProjectScanner } from "../services/ProjectScanner";
 import { OllamaClient } from "../ai/OllamaClient";
 import { ProjectArchitectPrompt } from "../ai/ProjectArchitectPrompt";
-import { JSONResponseParser as UniversalAIResponseParser } from "../ai/JSONResponseParser";
+import { JSONResponseParser } from "../ai/JSONResponseParser";
 import { BrainStore } from "../storage/BrainStore";
-import { ArchitectureProposalPanel, ModuleProposal } from "../panels/ArchitectureProposalPanel";
+import { AnalysisResultsPanel } from "../panels/AnalysisResultsPanel";
+
+interface AnalysisItem {
+    type: 'module' | 'idea' | 'risk';
+    title: string;
+    description: string;
+    details?: string;
+}
 
 export async function analyzeProject() {
-try {
-const store = new BrainStore();
-if (!store.isInitialized()) {
-vscode.window.showErrorMessage(
-"🧠 Please initialize Project Brain first (Ctrl+Shift+P → Project Brain: Initialize Project)"
-);
-return;
-}
+    try {
+        const store = new BrainStore();
+        if (!store.isInitialized()) {
+            vscode.window.showErrorMessage(
+                "🧠 Please initialize Project Brain first (Ctrl+Shift+P → Project Brain: Initialize Project)"
+            );
+            return;
+        }
 
-vscode.window.showInformationMessage("🔍 Scanning project...");
+        vscode.window.showInformationMessage("🔍 Scanning project...");
 
-const scanner = new ProjectScanner();
-const scan = await scanner.scan();
+        const scanner = new ProjectScanner();
+        const scan = await scanner.scan();
 
-console.log("=== SCAN RESULT ===");
-console.log("Files:", scan.files.length);
-console.log("Technologies:", scan.technologies);
+        vscode.window.showInformationMessage("🤖 AI analyzing architecture...");
 
-vscode.window.showInformationMessage("🤖 AI analyzing architecture...");
+        const ai = new OllamaClient();
+        const prompt = ProjectArchitectPrompt.build(scan);
+        const result = await ai.ask(prompt);
 
-const ai = new OllamaClient();
-const prompt = ProjectArchitectPrompt.build(scan);
-const result = await ai.ask(prompt);
+        if (!result.success) {
+            vscode.window.showErrorMessage("Project analysis failed: " + result.error);
+            return;
+        }
 
-console.log("=== AI RESULT ===");
-console.log("Success:", result.success);
-console.log("Error:", result.error);
-console.log("Content length:", result.content.length);
-console.log("Content preview:", result.content.substring(0, 500));
+        const parsed = JSONResponseParser.parse(result.content);
 
-if (!result.success) {
-vscode.window.showErrorMessage("Project analysis failed: " + result.error);
-return;
-}
+        if (parsed.modules.length === 0) {
+            vscode.window.showInformationMessage(
+                "🤖 AI didn't find any modules. Try running with more context."
+            );
+            return;
+        }
 
-const parsed = UniversalAIResponseParser.parse(result.content);
+        // Build items for results panel
+        const items: AnalysisItem[] = [];
 
-console.log("=== PARSED ===");
-console.log("Modules:", parsed.modules.length);
-console.log("Risks:", parsed.risks.length);
+        // Add modules
+        for (const m of parsed.modules) {
+            items.push({
+                type: 'module',
+                title: m.name,
+                description: m.description || 'Suggested module for your project',
+                details: m.files ? `Files: ${m.files.join(', ')}\n\nDependencies: ${(m.dependsOn || []).join(', ') || 'none'}` : undefined
+            });
+        }
 
-if (parsed.modules.length === 0) {
-vscode.window.showInformationMessage(
-"🤖 AI didn't find any modules. Check console for details."
-);
+        // Add risks
+        for (const r of parsed.risks || []) {
+            items.push({
+                type: 'risk',
+                title: r.title,
+                description: r.description || 'Potential issue to consider',
+                details: r.mitigation ? `Mitigation: ${r.mitigation}` : undefined
+            });
+        }
 
-// Show debug panel
-const panel = vscode.window.createWebviewPanel(
-"projectBrainDebug",
-"🔧 AI Response Debug",
-vscode.ViewColumn.Two,
-{}
-);
-panel.webview.html = `
-<html><body style="font-family: monospace; padding: 20px;">
-<h2>AI Raw Response</h2>
-<pre style="background: #eee; padding: 10px; overflow: auto; max-height: 400px;">${result.content.replace(/</g, '&lt;')}</pre>
-<h2>Parsed Result</h2>
-<pre style="background: #efe; padding: 10px; overflow: auto;">${JSON.stringify(parsed, null, 2).replace(/</g, '&lt;')}</pre>
-</body></html>
-`;
-return;
-}
+        // Add ideas from roadmap
+        for (const idea of parsed.roadmap || []) {
+            items.push({
+                type: 'idea',
+                title: idea.title,
+                description: idea.description || 'Suggested improvement',
+                details: `Order: ${idea.order}`
+            });
+        }
 
-const proposals: ModuleProposal[] = parsed.modules.map((m) => ({
-name: m.name,
-description: m.description,
-status: m.status,
-files: m.files || [],
-dependsOn: m.dependsOn || [],
-}));
+        // Show results panel
+        AnalysisResultsPanel.createOrShow(items);
 
-ArchitectureProposalPanel.createOrShow(proposals, async () => {
-const brainStore = new BrainStore();
-brainStore.setTechnologyStack(scan.technologies);
-brainStore.importFromAI({
-modules: parsed.modules,
-risks: parsed.risks,
-roadmap: parsed.roadmap,
-});
+        vscode.commands.executeCommand("projectBrainView.refresh");
 
-vscode.window.showInformationMessage(
-`✅ Added ${parsed.modules.length} modules to Project Brain`
-);
-
-vscode.commands.executeCommand("projectBrainView.refresh");
-vscode.commands.executeCommand("projectBrainDashboard.refresh");
-});
-
-} catch (error) {
-vscode.window.showErrorMessage("Project analysis error: " + String(error));
-console.error("Analysis error:", error);
-}
+    } catch (error) {
+        vscode.window.showErrorMessage("Project analysis error: " + String(error));
+        console.error("Analysis error:", error);
+    }
 }
