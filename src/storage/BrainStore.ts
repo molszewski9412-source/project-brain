@@ -493,5 +493,18 @@ updatedAt: timestamp,
 this.brain.initialized = true;
 this.brain.aiContext.projectSummary = "Project with " + this.brain.modules.length + " modules";
 this.save();
-}
+	}
+
+	deleteIdea(ideaId: string): void {
+		this.brain.ideas = this.brain.ideas.filter(i => i.id !== ideaId);
+		this.save();
+	}
+
+	updateIdeaStatus(ideaId: string, status: string): void {
+		const idea = this.brain.ideas.find(i => i.id === ideaId);
+		if (idea) {
+			(idea as any).status = status;
+			this.save();
+		}
+	}
 }

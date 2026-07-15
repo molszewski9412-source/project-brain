@@ -8,6 +8,7 @@ import { initializeProject } from './commands/initializeProject';
 import { ModuleCardPanel } from './panels/ModuleCardPanel';
 import { InitializePanel } from './panels/InitializePanel';
 import { ProposalPanel } from './panels/ProposalPanel';
+import { KanbanPanel } from './panels/KanbanPanel';
 import { addDecision } from './commands/addDecision';
 import { analyzeModule } from './commands/analyzeModule';
 import { analyzeProject } from './commands/analyzeProject';
@@ -155,6 +156,14 @@ vscode.commands.registerCommand('projectBrainView.refresh', () => provider.refre
 context.subscriptions.push(
 vscode.commands.registerCommand('projectBrainDashboard.refresh', () => dashboardProvider.refresh())
 );
+
+// Open Kanban Board
+context.subscriptions.push(
+vscode.commands.registerCommand('project-brain.openKanban', () => {
+KanbanPanel.createOrShow();
+})
+);
+
 }
 
 export function deactivate() {}

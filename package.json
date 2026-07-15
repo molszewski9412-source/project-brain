@@ -82,6 +82,10 @@
         "command": "project-brain.openMap",
         "title": "Project Brain: Open Architecture Map"
       },
+      {
+        "command": "project-brain.openKanban",
+        "title": "Project Brain: Open Kanban Board"
+      },
 
       {
         "command": "project-brain.openProposal",
