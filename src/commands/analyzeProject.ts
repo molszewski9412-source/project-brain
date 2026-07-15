@@ -47,7 +47,6 @@ const parsed = JSONResponseParser.parse(result.content);
 console.log("=== PARSED ===");
 console.log("Modules:", parsed.modules.length);
 console.log("Risks:", parsed.risks.length);
-console.log("Raw:", parsed.raw);
 
 if (parsed.modules.length === 0) {
 vscode.window.showInformationMessage(
