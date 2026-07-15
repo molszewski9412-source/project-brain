@@ -34,11 +34,16 @@ export class SimpleProjectProvider implements vscode.TreeDataProvider<vscode.Tre
         
         const items: vscode.TreeItem[] = [];
         
-        // Quick Actions
-        const actions = new vscode.TreeItem('⚡ Quick Actions');
-        actions.collapsibleState = vscode.TreeItemCollapsibleState.Expanded;
-        actions.contextValue = 'actions';
-        items.push(actions);
+        // Quick Actions with commands
+        const analyze = new vscode.TreeItem('🔄 Analyze Project');
+        analyze.contextValue = 'action';
+        analyze.command = { command: 'project-brain.analyzeProject', title: 'Analyze' };
+        items.push(analyze);
+
+        const kanban = new vscode.TreeItem('📋 Open Kanban');
+        kanban.contextValue = 'action';
+        kanban.command = { command: 'project-brain.openKanban', title: 'Open Kanban' };
+        items.push(kanban);
 
         // Modules
         const modulesItem = new vscode.TreeItem(`🗺️ Modules (${modules.length})`);
