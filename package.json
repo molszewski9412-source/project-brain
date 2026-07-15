@@ -84,6 +84,10 @@
       {
         "command": "project-brain.openProposal",
         "title": "Project Brain: Open Proposal"
+      },
+      {
+        "command": "projectBrainView.refresh",
+        "title": "Project Brain: Refresh"
       }
 
     ],
