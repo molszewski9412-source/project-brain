@@ -35,18 +35,8 @@
       "projectBrain": [
 
         {
-          "id": "projectBrainDashboard",
-          "name": "🧠 Dashboard"
-        },
-
-        {
           "id": "projectBrainView",
-          "name": "📦 Modules"
-        },
-
-        {
-          "id": "projectBrainKnowledgeView",
-          "name": "📚 Knowledge"
+          "name": "🧠 Project Brain"
         }
 
       ]
