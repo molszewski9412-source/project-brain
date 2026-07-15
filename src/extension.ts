@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 
-import { ProjectBrainProvider } from './providers/ProjectBrainProvider';
+import { SimpleProjectProvider } from './providers/SimpleProjectProvider';
 import { KnowledgeProvider } from './providers/KnowledgeProvider';
 import { ProjectDashboardProvider } from './providers/ProjectDashboardProvider';
 
@@ -19,7 +19,7 @@ import { BrainStore } from './storage/BrainStore';
 export function activate(context: vscode.ExtensionContext) {
 console.log('🧠 Project Brain activated');
 
-const provider = new ProjectBrainProvider();
+const provider = new SimpleProjectProvider();
 const dashboardProvider = new ProjectDashboardProvider();
 const knowledgeProvider = new KnowledgeProvider();
 
