@@ -64,7 +64,20 @@ export class AnalysisResultsPanel {
     }
 
     private addToKanban(item: AnalysisItem): void {
-        if (item.type === 'idea') {
+        if (item.type === 'module') {
+            // Add as MODULE (the correct way!)
+            this.store.addModule({
+                name: item.title,
+                description: item.description + (item.details ? '\n\n' + item.details : ''),
+                status: 'PLANNED',
+                progress: 0,
+                locked: false,
+                files: [],
+                dependsOn: [],
+                position: { x: 0, y: 0 }
+            });
+            vscode.window.showInformationMessage(`✅ Added module "${item.title}"`);
+        } else if (item.type === 'idea') {
             this.store.addIdea({
                 title: item.title,
                 description: item.description + (item.details ? '\n\n' + item.details : ''),
@@ -72,15 +85,7 @@ export class AnalysisResultsPanel {
                 affectedModules: [],
                 status: 'BACKLOG'
             });
-        } else if (item.type === 'module') {
-            // Add as idea with module tag
-            this.store.addIdea({
-                title: item.title,
-                description: item.description + (item.details ? '\n\n' + item.details : ''),
-                tags: ['module'],
-                affectedModules: [],
-                status: 'BACKLOG'
-            });
+            vscode.window.showInformationMessage(`✅ Added "${item.title}" to Kanban`);
         } else if (item.type === 'risk') {
             // Add as idea with risk tag
             this.store.addIdea({
@@ -90,12 +95,11 @@ export class AnalysisResultsPanel {
                 affectedModules: [],
                 status: 'BACKLOG'
             });
+            vscode.window.showInformationMessage(`✅ Added risk "${item.title}" to Kanban`);
         }
 
         // Mark item as added
         this.panel.webview.postMessage({ command: 'itemAdded', index: this.items.indexOf(item) });
-        
-        vscode.window.showInformationMessage(`✅ Added "${item.title}" to Kanban`);
     }
 
     private addAllToKanban(): void {
