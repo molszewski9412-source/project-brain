@@ -4,14 +4,7 @@ import { OllamaClient } from "../ai/OllamaClient";
 import { ProjectArchitectPrompt } from "../ai/ProjectArchitectPrompt";
 import { JSONResponseParser } from "../ai/JSONResponseParser";
 import { BrainStore } from "../storage/BrainStore";
-import { AnalysisResultsPanel } from "../panels/AnalysisResultsPanel";
-
-interface AnalysisItem {
-    type: 'module' | 'idea' | 'risk';
-    title: string;
-    description: string;
-    details?: string;
-}
+import { AIWorkflowKanban } from "../panels/AIWorkflowKanban";
 
 export async function analyzeProject() {
     try {
@@ -28,6 +21,15 @@ export async function analyzeProject() {
         const scanner = new ProjectScanner();
         const scan = await scanner.scan();
 
+        // Check if project is empty
+        if (scan.files.length === 0) {
+            vscode.window.showInformationMessage(
+                "📝 Project is empty! Add files or manually create tasks in the Kanban."
+            );
+            AIWorkflowKanban.createOrShow();
+            return;
+        }
+
         vscode.window.showInformationMessage("🤖 AI analyzing architecture...");
 
         const ai = new OllamaClient();
@@ -41,49 +43,59 @@ export async function analyzeProject() {
 
         const parsed = JSONResponseParser.parse(result.content);
 
-        if (parsed.modules.length === 0) {
+        if (parsed.modules.length === 0 && (!parsed.roadmap || parsed.roadmap.length === 0)) {
             vscode.window.showInformationMessage(
-                "🤖 AI didn't find any modules. Try running with more context."
+                "🤖 AI didn't find clear modules. Add tasks manually in the Kanban."
             );
+            AIWorkflowKanban.createOrShow();
             return;
         }
 
-        // Build items for results panel
-        const items: AnalysisItem[] = [];
+        // Add all results directly to BACKLOG
+        let addedCount = 0;
 
-        // Add modules
+        // Add modules as tasks
         for (const m of parsed.modules) {
-            items.push({
-                type: 'module',
+            store.addIdea({
                 title: m.name,
-                description: m.description || 'Suggested module for your project',
-                details: m.files ? `Files: ${m.files.join(', ')}\n\nDependencies: ${(m.dependsOn || []).join(', ') || 'none'}` : undefined
+                description: (m.description || 'Suggested module') + 
+                    (m.files && m.files.length > 0 ? '\n\n📁 Files: ' + m.files.join(', ') : ''),
+                tags: ['module', 'ai-suggested'],
+                affectedModules: [],
+                status: 'BACKLOG'
             });
+            addedCount++;
         }
 
-        // Add risks
+        // Add risks as tasks
         for (const r of parsed.risks || []) {
-            items.push({
-                type: 'risk',
-                title: r.title,
-                description: r.description || 'Potential issue to consider',
-                details: r.mitigation ? `Mitigation: ${r.mitigation}` : undefined
+            store.addIdea({
+                title: `⚠️ ${r.title}`,
+                description: (r.description || 'Potential issue') + 
+                    (r.mitigation ? '\n\n💡 Mitigation: ' + r.mitigation : ''),
+                tags: ['risk', 'ai-suggested'],
+                affectedModules: [],
+                status: 'BACKLOG'
             });
+            addedCount++;
         }
 
-        // Add ideas from roadmap
+        // Add roadmap items as tasks
         for (const idea of parsed.roadmap || []) {
-            items.push({
-                type: 'idea',
+            store.addIdea({
                 title: idea.title,
                 description: idea.description || 'Suggested improvement',
-                details: `Order: ${idea.order}`
+                tags: ['roadmap', 'ai-suggested'],
+                affectedModules: [],
+                status: 'BACKLOG'
             });
+            addedCount++;
         }
 
-        // Show results panel
-        AnalysisResultsPanel.createOrShow(items);
-
+        vscode.window.showInformationMessage(`✅ AI found ${addedCount} items - added to Backlog!`);
+        
+        // Open Kanban to show results
+        AIWorkflowKanban.createOrShow();
         vscode.commands.executeCommand("projectBrainView.refresh");
 
     } catch (error) {
