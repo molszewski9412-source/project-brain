@@ -1,5 +1,6 @@
 /**
- * AIWorkflowKanban - Smart Kanban with AI-assisted workflow
+ * AIWorkflowKanban - Intuitive AI-powered workflow
+ * Flow: BACKLOG → TODO (AI) → IN_PROGRESS (test) → DONE (locked)
  */
 import * as vscode from "vscode";
 import { BrainStore } from "../storage/BrainStore";
@@ -31,7 +32,7 @@ export class AIWorkflowKanban {
         
         const panel = vscode.window.createWebviewPanel(
             "aiWorkflowKanban",
-            "AI Workflow Kanban",
+            "⚡ AI Workflow",
             vscode.ViewColumn.One,
             { enableScripts: true }
         );
@@ -47,11 +48,8 @@ export class AIWorkflowKanban {
     private setupMessageHandler(): void {
         this.panel.webview.onDidReceiveMessage(async (msg) => {
             switch (msg.command) {
-                case "addCard":
-                    this.addCard(msg.status);
-                    break;
                 case "submitAddCard":
-                    this.handleAddCardSubmit(msg.title, msg.description, msg.status);
+                    this.handleAddCardSubmit(msg.title, msg.description);
                     break;
                 case "moveCard":
                     await this.handleMoveCard(msg.cardId, msg.fromStatus, msg.toStatus);
@@ -63,6 +61,12 @@ export class AIWorkflowKanban {
                 case "askAI":
                     await this.askAI(msg.cardId);
                     break;
+                case "approveProposal":
+                    await this.approveProposal(msg.cardId);
+                    break;
+                case "unblockCard":
+                    await this.unblockCard(msg.cardId);
+                    break;
             }
         });
     }
@@ -71,107 +75,117 @@ export class AIWorkflowKanban {
         const idea = this.store.getIdeas().find(i => i.id === cardId);
         if (!idea) return;
 
-        // BACKLOG → TODO: AI analyzes
         if (fromStatus === "BACKLOG" && toStatus === "TODO") {
-            vscode.window.showInformationMessage("Analyzing with AI...");
-            const analysis = await this.analyzeIdea(idea);
-            this.panel.webview.postMessage({ command: "showAnalysis", cardId, analysis });
-            return;
-        }
-
-        // TODO → IN_PROGRESS: User approves
-        if (fromStatus === "TODO" && toStatus === "IN_PROGRESS") {
-            const approved = await vscode.window.showQuickPick(["Yes, approve", "No, keep in Todo"], {
-                placeHolder: "Did you approve AI's proposal?"
-            });
-            if (approved === "Yes, approve") {
-                this.store.updateIdeaStatus(cardId, "IN_PROGRESS");
-                this.store.addRecentChange(`Started: ${idea.title}`, "Approved by user");
+            vscode.window.showInformationMessage("🤔 AI is analyzing...");
+            try {
+                const proposal = await this.getAIProposal(idea);
+                this.panel.webview.postMessage({ command: "showProposal", cardId, proposal });
+            } catch (error) {
+                this.store.updateIdeaStatus(cardId, "TODO");
+                this.update();
             }
+            return;
+        }
+
+        if (fromStatus === "TODO" && toStatus === "IN_PROGRESS") {
+            const branchName = `feature/${idea.title.toLowerCase().replace(/\s+/g, '-')}`;
+            try {
+                const terminal = vscode.window.createTerminal({ name: "Git Branch" });
+                terminal.sendText(`git checkout -b ${branchName}`);
+                terminal.show();
+                vscode.window.showInformationMessage(`✅ Branch "${branchName}" created!`);
+            } catch (e) {
+                vscode.window.showWarningMessage("Could not create branch");
+            }
+            this.store.updateIdeaStatus(cardId, "IN_PROGRESS");
+            this.store.addRecentChange(`Started: ${idea.title}`, "Working on it");
             this.update();
             return;
         }
 
-        // IN_PROGRESS → REVIEW
-        if (fromStatus === "IN_PROGRESS" && toStatus === "REVIEW") {
-            this.store.updateIdeaStatus(cardId, "REVIEW");
-            this.update();
-            return;
-        }
-
-        // REVIEW → DONE: Check if touching DONE modules
-        if (fromStatus === "REVIEW" && toStatus === "DONE") {
+        if (fromStatus === "IN_PROGRESS" && toStatus === "DONE") {
             const modules = this.store.getModules();
-            const doneModules = modules.filter(m => m.status === "DONE" || m.locked);
+            const existingModule = modules.find(m => m.name.toLowerCase() === idea.title.toLowerCase());
             
-            if (doneModules.length > 0) {
-                const runTests = await vscode.window.showQuickPick(
-                    ["Yes, run tests", "No, skip tests"],
-                    { placeHolder: "This touches DONE/LOCKED modules. Run tests?" }
-                );
-                if (runTests === "Yes, run tests") {
-                    vscode.window.showInformationMessage("Running tests...");
-                }
+            if (!existingModule) {
+                this.store.addModule({
+                    name: idea.title,
+                    description: idea.description || '',
+                    status: 'LOCKED',
+                    progress: 100,
+                    locked: true,
+                    files: [],
+                    dependsOn: [],
+                    position: { x: 0, y: 0 }
+                });
+            } else {
+                this.store.lockModule(existingModule.id);
             }
             
             this.store.updateIdeaStatus(cardId, "DONE");
-            this.store.addRecentChange(`Completed: ${idea.title}`, "Fully implemented");
+            this.store.addRecentChange(`Completed: ${idea.title}`, "Locked");
             this.update();
+            vscode.window.showInformationMessage(`🔒 "${idea.title}" done & locked!`);
             return;
         }
 
-        // Default move
         this.store.updateIdeaStatus(cardId, toStatus);
         this.update();
     }
 
-    private async analyzeIdea(idea: BrainIdea): Promise<string> {
+    private async getAIProposal(idea: BrainIdea): Promise<string> {
         const context = this.contextBuilder.buildContext({
             purpose: "suggest",
-            question: `Analyze: "${idea.title}"\n\n${idea.description || ""}\n\nWhat needs to be done?`
+            question: `Propose implementation for: "${idea.title}"\n\n${idea.description || ""}\n\nGive steps.`
         });
-
         try {
             const result = await this.ollama.ask(context);
             return result.success ? result.content : "AI not available";
         } catch {
-            return "AI not available. Please analyze manually.";
+            return "AI not available";
         }
     }
 
     private async askAI(cardId: string): Promise<void> {
         const idea = this.store.getIdeas().find(i => i.id === cardId);
         if (!idea) return;
-
         const context = this.contextBuilder.buildContext({
             purpose: "explain",
-            question: `Tell me about: "${idea.title}"`
+            question: `Explain: "${idea.title}"`
         });
-
         try {
             const result = await this.ollama.ask(context);
-            this.panel.webview.postMessage({ command: "showInsight", content: result.content });
+            this.panel.webview.postMessage({ command: "showAiChat", content: result.content });
         } catch {
             vscode.window.showErrorMessage("AI not available");
         }
     }
 
-    private addCard(status: string): void {
-        // Send to webview to show input modal
-        this.panel.webview.postMessage({ 
-            command: "showAddCardModal", 
-            status: status 
-        });
+    private async approveProposal(cardId: string): Promise<void> {
+        this.store.updateIdeaStatus(cardId, "TODO");
+        this.update();
     }
 
-    public handleAddCardSubmit(title: string, description: string, status: string): void {
+    private async unblockCard(cardId: string): Promise<void> {
+        const idea = this.store.getIdeas().find(i => i.id === cardId);
+        if (!idea) return;
+        const modules = this.store.getModules();
+        const module = modules.find(m => m.name.toLowerCase() === idea.title.toLowerCase());
+        if (module && module.locked) {
+            this.store.unlockModule(module.id);
+        }
+        this.store.updateIdeaStatus(cardId, "BACKLOG");
+        this.update();
+    }
+
+    private handleAddCardSubmit(title: string, description: string): void {
         if (title && title.trim()) {
             this.store.addIdea({
                 title: title.trim(),
                 description: description || "",
                 tags: [],
                 affectedModules: [],
-                status: status as any
+                status: "BACKLOG"
             });
             this.update();
         }
@@ -179,134 +193,154 @@ export class AIWorkflowKanban {
 
     private buildHtml(): string {
         const ideas = this.store.getIdeas();
-        const stats = this.store.getStats();
+        const modules = this.store.getModules();
+        const lockedCount = modules.filter(m => m.locked).length;
         
         const columns = [
-            { id: "BACKLOG", title: "Backlog", color: "#555", hint: "New ideas" },
-            { id: "TODO", title: "Todo", color: "#0079bf", hint: "AI analyzes" },
-            { id: "IN_PROGRESS", title: "In Progress", color: "#f5a623", hint: "Working" },
-            { id: "REVIEW", title: "Review", color: "#9b59b6", hint: "Testing" },
-            { id: "DONE", title: "Done", color: "#27ae60", hint: "Completed" }
+            { id: "BACKLOG", title: "📝 Backlog", color: "#555", hint: "All ideas" },
+            { id: "TODO", title: "🤔 TODO", color: "#0079bf", hint: "AI proposes" },
+            { id: "IN_PROGRESS", title: "⚡ In Progress", color: "#f5a623", hint: "Testing" },
+            { id: "DONE", title: "✅ Done", color: "#27ae60", hint: "Locked!" }
         ];
+
+        const cardData = ideas.map(i => ({ id: i.id, title: i.title, desc: i.description || "" }));
+        const cardDataJson = JSON.stringify(cardData);
 
         let html = `<!DOCTYPE html>
 <html><head><style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:Arial,sans-serif;background:#0f1419;color:#e7e9ea;padding:15px}
-.header{display:flex;justify-content:space-between;align-items:center;padding:15px;background:#1a1a2e;border-radius:10px;margin-bottom:15px}
-h1{color:#00d4ff}
-.stats{font-size:0.85em;color:#888}
-.board{display:flex;gap:12px;overflow-x:auto;padding-bottom:20px}
-.column{min-width:230px;max-width:230px;background:#1a1a2e;border-radius:10px;padding:10px}
-.column-header{padding:8px;border-bottom:3px solid #555;display:flex;justify-content:space-between}
-.column-title{font-weight:bold}
-.column-count{background:#333;padding:2px 8px;border-radius:10px;font-size:0.8em}
-.column-hint{font-size:0.7em;color:#666}
-.card{background:#16213e;padding:10px;margin:8px 0;border-radius:6px;border-left:4px solid #0079bf;cursor:grab}
-.card:hover{background:#1e2a4a}
-.card-title{font-weight:bold;margin-bottom:5px}
-.card-desc{font-size:0.85em;color:#888}
-.card-actions{display:flex;gap:5px;margin-top:8px}
-.btn{flex:1;padding:5px;border:none;border-radius:4px;cursor:pointer;font-size:0.8em}
-.btn-ai{background:#0079bf;color:#fff}
-.btn-del{background:#555;color:#fff}
-.add-btn{width:100%;padding:10px;background:transparent;border:2px dashed #333;border-radius:6px;color:#666;cursor:pointer;margin-top:8px}
-.add-btn:hover{border-color:#0079bf;color:#0079bf}
-.empty{text-align:center;color:#444;padding:20px;font-size:0.85em}
-.modal{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);z-index:1000;align-items:center;justify-content:center}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0f1419;color:#e7e9ea;padding:20px}
+.header{display:flex;justify-content:space-between;align-items:center;padding:20px;background:linear-gradient(135deg,#1a1a2e,#16213e);border-radius:12px;margin-bottom:20px}
+h1{color:#00d4ff;font-size:1.4em}
+.stats{display:flex;gap:10px}
+.stat{background:rgba(0,212,255,0.1);padding:8px 15px;border-radius:8px}
+.stat-value{color:#00d4ff;font-weight:bold}
+.board{display:grid;grid-template-columns:repeat(4,1fr);gap:15px}
+.column{background:#1a1a2e;border-radius:12px;padding:15px}
+.col-header{padding:12px;border-bottom:3px solid;border-radius:8px;margin-bottom:15px}
+.col-title{font-weight:bold;display:flex;justify-content:space-between}
+.col-count{background:#333;padding:2px 10px;border-radius:10px;font-size:0.8em}
+.card{background:#16213e;padding:12px;margin-bottom:10px;border-radius:8px;border-left:4px solid;cursor:pointer}
+.card.BACKLOG{border-color:#555}
+.card.TODO{border-color:#0079bf}
+.card.IN_PROGRESS{border-color:#f5a623}
+.card.DONE{border-color:#27ae60;background:#1a3a1a}
+.card-title{font-weight:bold;color:#fff;margin-bottom:5px}
+.card-desc{font-size:0.8em;color:#888}
+.empty{text-align:center;color:#444;padding:30px}
+.add-btn{width:100%;padding:12px;background:transparent;border:2px dashed #333;border-radius:8px;color:#666;cursor:pointer;margin-top:15px}
+.add-btn:hover{border-color:#00d4ff;color:#00d4ff}
+.modal{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.9);z-index:1000;align-items:center;justify-content:center}
 .modal.show{display:flex}
-.modal-content{background:#1a1a2e;max-width:600px;width:90%;max-height:80vh;border-radius:12px;padding:25px;overflow-y:auto}
-.modal-header{display:flex;justify-content:space-between;margin-bottom:15px}
+.modal-content{background:#1a1a2e;max-width:600px;width:95%;max-height:80vh;border-radius:16px;padding:25px;overflow-y:auto}
+.modal-header{display:flex;justify-content:space-between;margin-bottom:20px}
 .modal-title{color:#00d4ff;font-size:1.2em}
-.modal-close{cursor:pointer;color:#888;font-size:1.5em}
+.modal-close{background:none;border:none;color:#888;font-size:1.5em;cursor:pointer}
 .modal-body{color:#ccc;line-height:1.6;white-space:pre-wrap}
 .modal-actions{display:flex;gap:10px;margin-top:20px}
 .modal-btn{flex:1;padding:12px;border:none;border-radius:8px;cursor:pointer;font-weight:bold}
-.modal-btn.ok{background:#27ae60;color:#fff}
-.modal-btn.close{background:#555;color:#fff}
+.modal-btn.primary{background:#27ae60;color:#fff}
+.modal-btn.secondary{background:#333;color:#fff}
+.modal-btn.danger{background:#c0392b;color:#fff}
+.flow{background:#0a0a0f;padding:15px;border-radius:10px;margin-bottom:20px;font-size:0.85em}
+@media(max-width:1100px){.board{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:700px){.board{grid-template-columns:1fr}}
 </style></head><body>
 <div class="header">
-    <h1>AI Workflow Kanban</h1>
-    <div class="stats">Ideas: ${stats.ideas} | Decisions: ${stats.decisions} | Locked: ${stats.protectedModules}</div>
+<h1>⚡ AI Workflow</h1>
+<div class="stats">
+<span class="stat"><span class="stat-value">${ideas.length}</span> tasks</span>
+<span class="stat"><span class="stat-value">${lockedCount}</span> locked</span>
 </div>
-<div style="background:#1a1a2e;padding:10px 15px;border-radius:8px;margin-bottom:15px;font-size:0.85em;color:#888">
-<strong style="color:#00d4ff">Workflow:</strong> Backlog→Todo (AI) → In Progress (approve) → Review (test) → Done
+</div>
+<div class="flow">
+<strong>🚀 Flow:</strong> 📝 Backlog → 🤔 TODO (AI) → ⚡ In Progress → ✅ Done (locked!)
 </div>
 <div class="board">`;
 
         for (const col of columns) {
             const colIdeas = ideas.filter(i => i.status === col.id);
-            html += `<div class="column" data-status="${col.id}">
-                <div class="column-header" style="border-color:${col.color}">
-                    <div><div class="column-title">${col.title}</div><div class="column-hint">${col.hint}</div></div>
-                    <span class="column-count">${colIdeas.length}</span>
-                </div>`;
-            
-            if (colIdeas.length === 0) html += `<div class="empty">No cards</div>`;
-            
+            html += `<div class="column">
+<div class="col-header" style="border-color:${col.color}">
+<div class="col-title">${col.title}<span class="col-count">${colIdeas.length}</span></div>
+<div style="font-size:0.7em;color:#666">${col.hint}</div>
+</div>
+<div>`;
+            if (colIdeas.length === 0) html += `<div class="empty">No tasks</div>`;
             for (const idea of colIdeas) {
-                html += `<div class="card" draggable="true" data-id="${idea.id}" data-status="${idea.status}">
-                    <div class="card-title">${idea.title}</div>
-                    <div class="card-desc">${idea.description || ""}</div>
-                    <div class="card-actions">
-                        <button class="btn btn-ai" onclick="askAI('${idea.id}')">AI</button>
-                        <button class="btn btn-del" onclick="deleteCard('${idea.id}')">X</button>
-                    </div>
-                </div>`;
+                html += `<div class="card ${idea.status}" data-id="${idea.id}" data-status="${idea.status}">
+<div class="card-title">${idea.title}</div>
+<div class="card-desc">${(idea.description||"").substring(0,60)}</div>
+</div>`;
             }
-            html += `<button class="add-btn" onclick="addCard('${col.id}')">+ Add</button></div>`;
+            html += `</div><button class="add-btn" onclick="showAdd()">+ Add</button></div>`;
         }
 
         html += `</div>
-
-<!-- Add Card Modal -->
-<div class="modal" id="addCardModal">
-    <div class="modal-content">
-        <div class="modal-header"><span class="modal-title">Add New Idea</span><span class="modal-close" onclick="closeAddModal()">x</span></div>
-        <div style="margin: 15px 0">
-            <label style="display:block;margin-bottom:5px;color:#888">Title:</label>
-            <input type="text" id="cardTitle" style="width:100%;padding:10px;border-radius:6px;border:1px solid #333;background:#16213e;color:#fff" placeholder="What do you want to build?">
-        </div>
-        <div style="margin: 15px 0">
-            <label style="display:block;margin-bottom:5px;color:#888">Description (optional):</label>
-            <textarea id="cardDesc" style="width:100%;padding:10px;border-radius:6px;border:1px solid #333;background:#16213e;color:#fff;min-height:80px" placeholder="More details..."></textarea>
-        </div>
-        <div class="modal-actions">
-            <button class="modal-btn ok" onclick="submitAddCard()">Add Idea</button>
-            <button class="modal-btn close" onclick="closeAddModal()">Cancel</button>
-        </div>
-    </div>
-</div>
-
-<div class="modal" id="analysisModal">
-    <div class="modal-content">
-        <div class="modal-header"><span class="modal-title">AI Analysis</span><span class="modal-close" onclick="closeModal()">x</span></div>
-        <div class="modal-body" id="modalBody"></div>
-        <div class="modal-actions"><button class="modal-btn ok" onclick="closeModal()">Got it</button></div>
-    </div>
-</div>
+<div class="modal" id="addModal">
+<div class="modal-content">
+<div class="modal-header"><span class="modal-title">✨ Add Task</span><span class="modal-close" onclick="closeAdd()">×</span></div>
+<input type="text" id="taskTitle" style="width:100%;padding:12px;border-radius:8px;border:1px solid #333;background:#16213e;color:#fff;margin:15px 0" placeholder="Task name">
+<textarea id="taskDesc" style="width:100%;padding:12px;border-radius:8px;border:1px solid #333;background:#16213e;color:#fff;min-height:80px;resize:none" placeholder="Description"></textarea>
+<div class="modal-actions"><button class="modal-btn primary" onclick="submit()">Add</button><button class="modal-btn secondary" onclick="closeAdd()">Cancel</button></div>
+</div></div>
+<div class="modal" id="detailModal">
+<div class="modal-content">
+<div class="modal-header"><span class="modal-title" id="dTitle"></span><span class="modal-close" onclick="closeDetail()">×</span></div>
+<div class="modal-body" id="dBody"></div>
+<div class="modal-actions" id="dActions"></div>
+</div></div>
+<div class="modal" id="aiModal">
+<div class="modal-content">
+<div class="modal-header"><span class="modal-title">🤖 AI Proposal</span><span class="modal-close" onclick="closeAi()">×</span></div>
+<div class="modal-body" id="aiBody" style="background:#0a0a0f;padding:15px;border-radius:8px">Analyzing...</div>
+<div class="modal-actions"><button class="modal-btn primary" id="approveBtn" onclick="doApprove()">Approve</button><button class="modal-btn secondary" onclick="closeAi()">Cancel</button></div>
+</div></div>
 <script>
 const vscode=acquireVsCodeApi();
-let currentCard=null;
-let pendingStatus=null;
+const cardData=${cardDataJson};
+let currentId=null;
 
-document.addEventListener('dragstart',e=>{if(e.target.classList.contains('card')){e.target.classList.add('dragging');currentCard={id:e.target.dataset.id,from:e.target.dataset.status}}});
-document.addEventListener('dragend',e=>{if(e.target.classList.contains('card'))e.target.classList.remove('dragging')});
-document.addEventListener('dragover',e=>e.preventDefault());
-document.addEventListener('drop',e=>{e.preventDefault();const col=e.target.closest('.column');if(col&&currentCard){const to=col.dataset.status;vscode.postMessage({command:'moveCard',cardId:currentCard.id,fromStatus:currentCard.from,toStatus:to})}currentCard=null});
+document.querySelectorAll('.card').forEach(c=>c.addEventListener('click',()=>showDetail(c.dataset.id,c.dataset.status)));
 
-function addCard(status){pendingStatus=status;document.getElementById('addCardModal').classList.add('show');document.getElementById('cardTitle').focus()}
-function closeAddModal(){document.getElementById('addCardModal').classList.remove('show');document.getElementById('cardTitle').value='';document.getElementById('cardDesc').value='';pendingStatus=null}
-function submitAddCard(){const t=document.getElementById('cardTitle').value.trim();const d=document.getElementById('cardDesc').value.trim();if(t&&pendingStatus){vscode.postMessage({command:'submitAddCard',title:t,description:d,status:pendingStatus})}closeAddModal()}
-function deleteCard(id){if(confirm('Delete?'))vscode.postMessage({command:'deleteCard',cardId:id})}
-function askAI(id){vscode.postMessage({command:'askAI',cardId:id})}
-function closeModal(){document.getElementById('analysisModal').classList.remove('show')}
+document.addEventListener('dragstart',e=>{if(e.target.classList.contains('card'))currentId=e.target.dataset.id});
+document.addEventListener('dragend',e=>{if(currentId){const col=e.target.closest('.column');if(col){const to=col.dataset.status;if(e.target.dataset.status!==to)vscode.postMessage({command:'moveCard',cardId:currentId,fromStatus:e.target.dataset.status,toStatus:to})}}currentId=null});
+
+function showAdd(){document.getElementById('addModal').classList.add('show')}
+function closeAdd(){document.getElementById('addModal').classList.remove('show');document.getElementById('taskTitle').value='';document.getElementById('taskDesc').value=''}
+function submit(){const t=document.getElementById('taskTitle').value.trim();const d=document.getElementById('taskDesc').value.trim();if(t)vscode.postMessage({command:'submitAddCard',title:t,description:d});closeAdd()}
+
+function showDetail(id,status){
+currentId=id;
+const card=cardData.find(c=>c.id===id);
+if(!card)return;
+let actions='';
+if(status==='BACKLOG')actions='<button class="modal-btn primary" onclick="moveTODO()">🤔 Move to TODO</button>';
+if(status==='TODO')actions='<button class="modal-btn primary" onclick="askAI()">🤖 Ask AI</button><button class="modal-btn secondary" onclick="moveProgress()">⚡ Start</button>';
+if(status==='IN_PROGRESS')actions='<button class="modal-btn primary" onclick="markDone()">✅ Done!</button>';
+if(status==='DONE')actions='<button class="modal-btn secondary" onclick="unblock()">🔓 Unblock</button>';
+actions+='<button class="modal-btn danger" onclick="deleteCard()">🗑️</button>';
+document.getElementById('dTitle').textContent=card.title;
+document.getElementById('dBody').innerHTML='<p>'+(card.desc||'No description')+'</p>';
+document.getElementById('dActions').innerHTML=actions;
+document.getElementById('detailModal').classList.add('show');
+}
+
+function closeDetail(){document.getElementById('detailModal').classList.remove('show');currentId=null}
+function moveTODO(){vscode.postMessage({command:'moveCard',cardId:currentId,fromStatus:'BACKLOG',toStatus:'TODO'});closeDetail()}
+function moveProgress(){vscode.postMessage({command:'moveCard',cardId:currentId,fromStatus:'TODO',toStatus:'IN_PROGRESS'});closeDetail()}
+function markDone(){vscode.postMessage({command:'moveCard',cardId:currentId,fromStatus:'IN_PROGRESS',toStatus:'DONE'});closeDetail()}
+function unblock(){vscode.postMessage({command:'unblockCard',cardId:currentId});closeDetail()}
+function deleteCard(){if(confirm('Delete?'))vscode.postMessage({command:'deleteCard',cardId:currentId});closeDetail()}
+function askAI(){vscode.postMessage({command:'askAI',cardId:currentId});closeDetail()}
+function closeAi(){document.getElementById('aiModal').classList.remove('show')}
+function doApprove(){vscode.postMessage({command:'approveProposal',cardId:currentId});closeAi()}
 
 window.addEventListener('message',e=>{
 const m=e.data;
-if(m.command==='showAnalysis'){document.getElementById('modalBody').textContent=m.analysis;document.getElementById('analysisModal').classList.add('show')}
-if(m.command==='showInsight')alert(m.content.substring(0,500))
-if(m.command==='showAddCardModal'){pendingStatus=m.status;document.getElementById('addCardModal').classList.add('show');document.getElementById('cardTitle').focus()}
+if(m.command==='showProposal'){document.getElementById('aiBody').innerHTML='<pre>'+m.proposal.replace(/</g,'&lt;')+'</pre>';currentId=m.cardId;document.getElementById('aiModal').classList.add('show')}
+if(m.command==='showAiChat')alert(m.content.substring(0,400))
+if(m.command==='refresh')location.reload()
 });
 </script></body></html>`;
 
