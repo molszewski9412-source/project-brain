@@ -1,261 +1,96 @@
-# Project Brain - Roadmap do MVP
+# Project Brain - Roadmap
 
-## 🎯 Wizja MVP
-**Minimal Viable Product**: Rozszerzenie VS Code, które skanuje projekt, proponuje moduły i pozwala zarządzać pomysłami na kanbanie z pomocą AI.
-
----
-
-## ✅ CO JUŻ DZIAŁA (v0.0.1)
-
-| Funkcja | Status | Uwagi |
-|---------|--------|-------|
-| Inicjalizacja projektu | ✅ Done | Tworzy `.projectbrain/architecture.json` |
-| Left Panel (Tree View) | ✅ Done | SimpleProjectProvider |
-| Skanowanie projektu | ✅ Done | ProjectScanner analizuje pliki |
-| Analiza AI | ✅ Done | OllamaClient + ProjectArchitectPrompt |
-| AI Workflow Kanban | ✅ Done | Backlog→Todo→InProgress→Review→Done |
-| Persystencja danych | ✅ Done | BrainStore zapisuje do JSON |
+## 🎯 Wizja
+Rozszerzenie VS Code, które skanuje projekt z AI i pozwala zarządzać zadaniami w intuicyjnym kanbanie z auto-lockiem skończonego kodu.
 
 ---
 
-## 🎯 MVP CHECKLIST (v0.1.0)
+## ✅ CO DZIAŁA (v0.1.0)
 
-### MUST HAVE - bez tego MVP nie działa
-
-#### M1: ModuleCardPanel - szczegóły modułu
-```
-├── Kliknięcie na moduł → otwiera panel z detalami
-├── Pokazuje: nazwa, opis, status, pliki, zależności
-├── Przyciski akcji: Lock/Unlock, Edit, Delete
-└── Wiązanie z kanbanem (które idee dotyczą modułu)
-```
-- [ ] `ModuleCardPanel.ts` - panel z formularzem
-- [ ] `extension.ts` - rejestracja command `project-brain.openModule`
-- [ ] `BrainStore` - metody `updateModule()`, `deleteModule()`
-
-#### M2: Decision Management
-```
-├── Dodawanie decyzji architektonicznych
-├── Powiązanie z modułami
-├── Status: Proposed → Approved/Rejected
-└── AI podpowiada decyzje podczas analizy
-```
-- [ ] `addDecision.ts` - komenda dodawania
-- [ ] `DecisionPanel.ts` - panel do zarządzania
-- [ ] `BrainStore` - metody `addDecision()`, `updateDecision()`
-
-#### M3: AnalysisResultsPanel - akceptacja wyników
-```
-├── AI proponuje moduły po analizie
-├── Użytkownik może: Accept, Modify, Reject
-├── Accept → dodaje moduł do listy
-└── Modify → edycja przed dodaniem
-```
-- [ ] Przycisk "Accept" dodaje moduł do `BrainStore`
-- [ ] Przycisk "Add to Kanban" tworzy ideę
-- [ ] Persystencja zaakceptowanych modułów
-
-#### M4: Konfiguracja Ollamy
-```
-├── Settings: adres Ollamy (domyślnie localhost:11434)
-├── Test connection
-└── Fallback jeśli Ollama niedostępna
-```
-- [ ] `package.json` - contribute configuration
-- [ ] `OllamaClient` - read settings, timeout handling
+| Funkcja | Status |
+|---------|--------|
+| Inicjalizacja projektu | ✅ |
+| Left Panel (Tree View) | ✅ |
+| Skanowanie + Analiza AI | ✅ |
+| Intuicyjny AI Workflow Kanban | ✅ |
+| Module CRUD (Add/Edit/Lock/Unlock/Delete) | ✅ |
+| Auto-lock kodu gdy zadanie DONE | ✅ |
+| Persystencja (BrainStore → JSON) | ✅ |
 
 ---
 
-### SHOULD HAVE - poprawia UX
+## 🚀 INTUICyjNY WORKFLOW
 
-#### S1: Visual Status Indicators
 ```
-├── Kolorowe badge'y przy modułach (status)
-├── Progress bar dla IN_PROGRESS
-└── Lock icon dla LOCKED modułów
-```
-
-#### S2: Quick Actions w Tree View
-```
-├── Prawy klik → menu kontekstowe
-├── Add Module, Add Decision
-└── Analyze Module, Delete
+📝 BACKLOG          🤔 TODO            ⚡ IN PROGRESS      ✅ DONE
+─────────────────────────────────────────────────────────────────────
+Wszystkie         AI analizuje       Branch utworzony    Kod zablokowany!
+idee              i proponuje        Testuję zmiany     🔒 LOCKED!
 ```
 
-#### S3: Drag & Drop na Kanbanie
-```
-├── Przeciąganie kart między kolumnami
-├── Automatyczny update status w BrainStore
-└── AI trigger na BACKLOG → TODO
-```
+**Flow:**
+1. `Analyze Project` → AI skanuje → wszystko do BACKLOG
+2. BACKLOG → TODO → AI proponuje implementację
+3. TODO → IN_PROGRESS → tworzy branch, testuję
+4. IN_PROGRESS → DONE → kod LOCKED!
 
 ---
 
-### NICE TO HAVE - dla wygody
+## 📋 DO ZROBIENIA
 
-#### N1: Keyboard Shortcuts
-```
-├── Ctrl+Shift+A - Analyze Project
-├── Ctrl+Shift+K - Open Kanban
-└── Ctrl+Shift+M - Add Module
-```
+### 🔴 WYSOKI PRIORYTET
 
-#### N2: README.md dla użytkowników
-```
-├── Instalacja krok po kroku
-├── Screenshots
-├── Wymagania (Ollama)
-└── FAQ
-```
+#### README.md
+- Instalacja krok po kroku
+- Screenshots
+- Wymagania (Ollama)
+- FAQ
 
----
+#### Test na czystym projekcie
+- Czy wszystko działa od zera?
 
-## 📅 HARMONOGRAM
+### 🟡 ŚREDNI PRIORYTET
 
-### Sprint 1: Module Management
-- [ ] ModuleCardPanel kompletny
-- [ ] Podstawowe CRUD dla modułów
-- [ ] Lock/Unlock functionality
+#### Settings dla Ollamy
+- Konfiguracja adresu (localhost:11434)
+- Test connection
+- Fallback jeśli niedostępna
 
-### Sprint 2: Decision Flow  
-- [ ] Decision panel
-- [ ] Powiązanie z modułami
-- [ ] AI suggestions
+#### Keyboard Shortcuts
+- Ctrl+Shift+A - Analyze Project
+- Ctrl+Shift+K - Open Kanban
+- Ctrl+Shift+M - Add Module
 
-### Sprint 3: Analysis Integration
-- [ ] Accept/Modify/Reject dla wyników
-- [ ] Add to Kanban integration
-- [ ] Test full flow
+### 🟢 OPCJONALNE
 
-### Sprint 4: Polish & Docs
-- [ ] Settings panel
-- [ ] README
-- [ ] Test na czystym projekcie
+#### Decision Panel
+- Pełny CRUD dla decyzji architektonicznych
+- Powiązanie z modułami
+- Approve/Reject workflow
 
 ---
 
-## 🔧 TECHNICAL NOTES
+## 📁 ARCHITEKTURA
 
-### Data Flow (aktualny)
 ```
-User → Command → Service → AI → Parser → Store → Panel → Tree Refresh
+Key Classes:
+├── BrainStore         - single source of truth (JSON)
+├── ProjectScanner    - filesystem analysis
+├── OllamaClient      - AI communication
+├── SimpleProjectProvider  - left panel
+└── AIWorkflowKanban  - main kanban UI
 ```
 
 ### Storage
 ```
 .projectbrain/
-├── architecture.json  (BrainStore)
-└── .projectbrain/     (nie dotykać!)
-```
-
-### Key Classes
-- `BrainStore` - single source of truth
-- `ProjectScanner` - filesystem analysis
-- `OllamaClient` - AI communication
-- `SimpleProjectProvider` - left panel
-- `AIWorkflowKanban` - main kanban UI
-
----
-
-## 🚀 AKTUALNY PRIORYTET
-
-**Następny krok**: Naprawić ModuleCardPanel - niekompatybilne typy
-
-**Problem znaleziony**: 
-- `ModuleCardPanel.ts` używa `ProjectModule` z `models/Module.ts`
-- `BrainStore` operuje na `BrainModule` z `models/ProjectBrain.ts`
-- **Te dwa modele są niekompatybilne!** 
-
-**Rozwiązanie**: Przepisać ModuleCardPanel żeby używał `BrainModule`
-
----
-
-## 🐛 BUGS DO NAPRAWY
-
-### B1: ModuleCardPanel Type Mismatch 🔴 CRITICAL
-```typescript
-// Problem: ModuleCardPanel.ts line 2
-import { ProjectModule } from '../models/Module';  // ❌ STARY model
-
-// BrainStore operuje na: BrainModule z models/ProjectBrain.ts
-// Ale ModuleCardPanel oczekuje: ProjectModule z models/Module.ts
-
-// Te dwa interfejsy są prawie identyczne ale NIEkompatybilne!
-// Solution: zmienić import na BrainModule i dostosować HTML
-```
-
-### B2: AnalysisResultsPanel - dodaje DO KANBANU, nie do MODUŁÓW 🔴 CRITICAL
-```typescript
-// Problem: Line 66-93 w addToKanban()
-// Wszystko dodaje jako BrainIdea (do kanbanu)
-//
-// Ale moduły z AI powinny być dodawane jako BrainModule!
-// current code:
-//   this.store.addIdea({ title, tags: ['module'], ... })
-//
-// powinno być:
-//   this.store.addModule({ name: title, description, status: 'PLANNED', ... })
-```
-
-### B3: addDecision - STARY Store 🔴 CRITICAL
-```typescript
-// Problem: addDecision.ts używa STARYCH klas!
-import { ProjectDecision } from '../models/Decision';      // ❌ STARY
-import { ProjectStore } from '../storage/projectStore';   // ❌ STARY
-
-// Powinno używać:
-import { BrainDecision } from '../models/ProjectBrain';  // ✅ NOWY
-import { BrainStore } from '../storage/BrainStore';       // ✅ NOWY
+└── architecture.json  (BrainStore)
 ```
 
 ---
 
-## 📁 STARY vs NOWY KOD (do usunięcia po migracji)
+## 🎯 NASTĘPNY KROK
 
-### Stare pliki (martwy kod):
-```
-src/models/
-  ├── Module.ts          ❌ (używany przez ModuleCardPanel)
-  ├── Decision.ts        ❌ (używany przez addDecision)
-  └── ...
+**README.md** - dokumentacja dla użytkowników
 
-src/storage/
-  ├── projectStore.ts    ❌ (używany przez addDecision)
-  └── ...
-
-src/providers/
-  └── ProjectDashboardProvider.ts  ❌ (nie zarejestrowany)
-```
-
-### Nowe pliki (aktywne):
-```
-src/models/ProjectBrain.ts     ✅ (główny model)
-src/storage/BrainStore.ts      ✅ (główny store)
-src/providers/SimpleProjectProvider.ts  ✅ (aktywny)
-```
-
----
-
-## 📋 MVP v0.1.0 - DEFINITYWNA LISTA
-
-### Fazie 1: Fix Types & Integration
-- [x] B1: Napraw ModuleCardPanel → używaj BrainModule ✅
-- [x] B2: AnalysisResultsPanel → Accept dodaje do BrainStore ✅
-- [x] B3: addDecision → teraz używa BrainStore ✅
-
-### Fazie 2: Module CRUD ✅
-- [x] M1: Otwieranie modułu (click w tree → ModuleCardPanel) ✅
-- [x] M2: Edycja modułu (status, description, files) ✅
-- [x] M3: Lock/Unlock (z confirm dialog) ✅
-- [x] M4: Delete (z confirm, sprawdza locked) ✅
-- [x] M5: Add Module command ✅
-
-### Fazie 3: Decision Flow
-- [ ] D1: Decision panel - pełny CRUD
-- [ ] D2: Approve/Reject workflow
-- [ ] D3: Powiązanie decisions ↔ modules
-
-### Fazie 4: Polish
-- [ ] S1: Settings dla Ollamy
-- [ ] S2: README.md
-- [ ] Test: instalacja od zera
+Po tym: **test na czystym projekcie** i release!
