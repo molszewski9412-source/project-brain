@@ -243,16 +243,17 @@ src/providers/SimpleProjectProvider.ts  ✅ (aktywny)
 - [x] B2: AnalysisResultsPanel → Accept dodaje do BrainStore ✅
 - [x] B3: addDecision → teraz używa BrainStore ✅
 
-### Fazie 2: Module CRUD
-- [ ] M1: Otwieranie modułu (click w tree → ModuleCardPanel)
-- [ ] M2: Edycja modułu (status, description, files)
-- [ ] M3: Lock/Unlock (z confirm dialog)
-- [ ] M4: Delete (z confirm, sprawdza locked)
+### Fazie 2: Module CRUD ✅
+- [x] M1: Otwieranie modułu (click w tree → ModuleCardPanel) ✅
+- [x] M2: Edycja modułu (status, description, files) ✅
+- [x] M3: Lock/Unlock (z confirm dialog) ✅
+- [x] M4: Delete (z confirm, sprawdza locked) ✅
+- [x] M5: Add Module command ✅
 
 ### Fazie 3: Decision Flow
-- [ ] M5: Decision panel - pełny CRUD
-- [ ] M6: Approve/Reject workflow
-- [ ] M7: Powiązanie decisions ↔ modules
+- [ ] D1: Decision panel - pełny CRUD
+- [ ] D2: Approve/Reject workflow
+- [ ] D3: Powiązanie decisions ↔ modules
 
 ### Fazie 4: Polish
 - [ ] S1: Settings dla Ollamy

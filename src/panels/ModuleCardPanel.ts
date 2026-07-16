@@ -55,8 +55,50 @@ break;
 case 'updateStatus':
 this.updateStatus(msg.status);
 break;
+case 'updateDescription':
+this.updateDescription(msg.description);
+break;
+case 'addFile':
+this.addFile(msg.file);
+break;
+case 'removeFile':
+this.removeFile(msg.file);
+break;
 }
 });
+}
+
+private updateDescription(description: string): void {
+try {
+this.store.updateModule(this.module.id, { description });
+vscode.window.showInformationMessage("Description updated");
+vscode.commands.executeCommand('projectBrainView.refresh');
+} catch (error) {
+vscode.window.showErrorMessage(String(error));
+}
+}
+
+private addFile(file: string): void {
+if (!file || this.module.files.includes(file)) return;
+try {
+const newFiles = [...this.module.files, file];
+this.store.updateModule(this.module.id, { files: newFiles });
+vscode.window.showInformationMessage(`Added file: ${file}`);
+vscode.commands.executeCommand('projectBrainView.refresh');
+} catch (error) {
+vscode.window.showErrorMessage(String(error));
+}
+}
+
+private removeFile(file: string): void {
+try {
+const newFiles = this.module.files.filter(f => f !== file);
+this.store.updateModule(this.module.id, { files: newFiles });
+vscode.window.showInformationMessage(`Removed file: ${file}`);
+vscode.commands.executeCommand('projectBrainView.refresh');
+} catch (error) {
+vscode.window.showErrorMessage(String(error));
+}
 }
 
 private lockModule(): void {
@@ -139,10 +181,15 @@ h1 { color: #fff; font-size: 1.4em; }
 .btn-lock { background: #4d0000; color: #ff6b6b; }
 .btn-unlock { background: #004d00; color: #00ff00; }
 .btn-delete { background: #555; color: #fff; }
+.btn-edit { background: #0079bf; color: #fff; }
 .btn:hover { opacity: 0.85; }
 select { background: #333; color: #fff; padding: 8px; border-radius: 6px; border: 1px solid #444; margin-top: 10px; }
-.files-list { font-size: 0.9em; color: #888; }
-.files-list span { background: #333; padding: 2px 6px; border-radius: 3px; margin: 2px; display: inline-block; }
+textarea { width: 100%; min-height: 80px; background: #333; color: #fff; border: 1px solid #444; border-radius: 6px; padding: 10px; margin-top: 5px; resize: vertical; }
+input[type="text"] { width: 100%; background: #333; color: #fff; border: 1px solid #444; border-radius: 6px; padding: 8px; margin-top: 5px; }
+.files-list { font-size: 0.9em; color: #888; display: flex; flex-wrap: wrap; gap: 5px; }
+.file-tag { background: #333; padding: 4px 8px; border-radius: 4px; display: inline-flex; align-items: center; gap: 5px; }
+.file-tag button { background: none; border: none; color: #888; cursor: pointer; padding: 0; font-size: 1em; }
+.file-tag button:hover { color: #ff6b6b; }
 </style>
 </head>
 <body>
@@ -162,28 +209,19 @@ ${statusOptions}
 
 <div class="section">
 <h3>📝 Description</h3>
-<p>${this.module.description || '<span class="empty">No description</span>'}</p>
+<textarea id="descInput" placeholder="Enter description...">${this.module.description || ''}</textarea>
+<button class="btn btn-edit" style="margin-top:10px" onclick="saveDesc()">💾 Save Description</button>
 </div>
 
 <div class="section">
 <h3>📁 Files (${this.module.files.length})</h3>
+<div style="margin-bottom: 10px;">
+<input type="text" id="fileInput" placeholder="Enter file path...">
+<button class="btn btn-edit" style="margin-top:5px" onclick="addFile()">➕ Add File</button>
+</div>
 ${this.module.files.length > 0 
-? `<div class="files-list">${this.module.files.map(f => `<span>${f}</span>`).join('')}</div>` 
+? `<div class="files-list">${this.module.files.map(f => `<span class="file-tag">${f}<button onclick="removeFile('${f}')">×</button></span>`).join('')}</div>` 
 : '<p class="empty">No files linked</p>'}
-</div>
-
-<div class="section">
-<h3>📋 Ideas (${ideas.length})</h3>
-${ideas.length > 0 
-? ideas.map(i => `<div class="item"><strong>${i.title}</strong> <small>(${i.status})</small></div>`).join('')
-: '<p class="empty">No related ideas</p>'}
-</div>
-
-<div class="section">
-<h3>🏛️ Decisions (${decisions.length})</h3>
-${decisions.length > 0 
-? decisions.map(d => `<div class="item"><strong>${d.title}</strong><br><small style="color:#888">${d.description}</small></div>`).join('')
-: '<p class="empty">No decisions</p>'}
 </div>
 
 <div class="section">
@@ -207,6 +245,18 @@ function lock() { vscode.postMessage({ command: 'lock' }); }
 function unlock() { vscode.postMessage({ command: 'unlock' }); }
 function del() { if (confirm('Delete this module?')) vscode.postMessage({ command: 'delete' }); }
 function updateStatus(s) { vscode.postMessage({ command: 'updateStatus', status: s }); }
+function saveDesc() { 
+    const desc = document.getElementById('descInput').value;
+    vscode.postMessage({ command: 'updateDescription', description: desc });
+}
+function addFile() {
+    const file = document.getElementById('fileInput').value.trim();
+    if (file) {
+        vscode.postMessage({ command: 'addFile', file: file });
+        document.getElementById('fileInput').value = '';
+    }
+}
+function removeFile(f) { vscode.postMessage({ command: 'removeFile', file: f }); }
 </script>
 </body>
 </html>`;

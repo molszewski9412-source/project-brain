@@ -49,6 +49,11 @@ export class SimpleProjectProvider implements vscode.TreeDataProvider<vscode.Tre
         }
 
         // === MAIN ACTIONS ===
+        const addModule = new vscode.TreeItem('➕ Add Module');
+        addModule.contextValue = 'action';
+        addModule.command = { command: 'project-brain.addModule', title: 'Add Module' };
+        items.push(addModule);
+
         const analyze = new vscode.TreeItem('🔄 Analyze Project');
         analyze.contextValue = 'action';
         analyze.command = { command: 'project-brain.analyzeProject', title: 'Analyze' };
