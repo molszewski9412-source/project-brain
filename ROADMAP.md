@@ -40,11 +40,11 @@ idee              i proponuje        Testuję zmiany     🔒 LOCKED!
 
 ### 🔴 WYSOKI PRIORYTET
 
-#### README.md
-- Instalacja krok po kroku
-- Screenshots
-- Wymagania (Ollama)
-- FAQ
+#### ✅ README.md - GOTOWE!
+- Instalacja krok po kroku ✅
+- Workflow diagram ✅
+- Konfiguracja ✅
+- FAQ ✅
 
 #### Test na czystym projekcie
 - Czy wszystko działa od zera?
@@ -67,6 +67,14 @@ idee              i proponuje        Testuję zmiany     🔒 LOCKED!
 - Pełny CRUD dla decyzji architektonicznych
 - Powiązanie z modułami
 - Approve/Reject workflow
+
+---
+
+## 🎯 NASTĘPNY KROK
+
+**Test na czystym projekcie** - uruchomić rozszerzenie i sprawdzić czy wszystko działa
+
+Po tym: **Release v0.1.0!**
 
 ---
 
