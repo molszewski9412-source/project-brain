@@ -258,4 +258,24 @@ links: BrainLink[];
 // Project metadata
 technologyStack: string[];
 configFiles: string[];
+
+// AI Provider Configuration - TASK 8.1, 8.2, 8.3
+aiProviders: AIProviderConfig;
+defaultAIProvider: string;
+}
+
+// AI Provider Configuration - TASK 8.1, 8.2, 8.3
+export interface AIProviderConfig {
+	openai?: {
+		apiKey: string;
+		model: string;
+	};
+	claude?: {
+		apiKey: string;
+		model: string;
+	};
+	gemini?: {
+		apiKey: string;
+		model: string;
+	};
 }

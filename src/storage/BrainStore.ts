@@ -23,6 +23,7 @@ AIConstraint,
 ModuleStatus,
 DecisionStatus,
 } from "../models/ProjectBrain";
+import { BrainEpic, BrainFeature, BrainTask as HierarchyTask } from "../models/Hierarchy";
 
 export class BrainStore {
 private brainFile: string = "";
@@ -105,6 +106,8 @@ history: [],
 links: [],
 technologyStack: [],
 configFiles: [],
+	aiProviders: {},
+	defaultAIProvider: "ollama",
 };
 }
 
@@ -302,24 +305,6 @@ this.addHistory("UNLOCK", "Module", id, `Unlocked module: ${module.name}`);
 this.save();
 }
 
-// === TASKS ===
-
-getTasks(): BrainTask[] {
-return this.brain?.tasks || [];
-}
-
-addTask(task: Omit<BrainTask, "id" | "createdAt" | "updatedAt">): BrainTask {
-const newTask: BrainTask = {
-...task,
-id: this.generateId(),
-createdAt: this.getTimestamp(),
-updatedAt: this.getTimestamp(),
-};
-this.brain.tasks.push(newTask);
-this.save();
-return newTask;
-}
-
 // === IDEAS ===
 
 getIdeas(): BrainIdea[] {
@@ -398,7 +383,15 @@ return (this.brain?.roadmap || []).sort((a, b) => a.order - b.order);
 // === UTILITIES ===
 
 getProjectName(): string {
-return this.brain?.projectName || "Unknown Project";
+    return this.brain?.projectName || "Unknown Project";
+}
+
+getProjectSummary(): string {
+    return this.brain?.aiContext?.projectSummary || this.brain?.projectName || "Unknown Project";
+}
+
+getBrain(): ProjectBrain | undefined {
+    return this.brain;
 }
 
 setTechnologyStack(stack: string[]): void {
@@ -506,5 +499,80 @@ this.save();
 			(idea as any).status = status;
 			this.save();
 		}
+	}
+
+	// === EPICS (FAZA 6) ===
+	private _epics: BrainEpic[] = [];
+	
+	addEpic(epic: Omit<BrainEpic, "id" | "createdAt" | "updatedAt">): BrainEpic {
+		const newEpic: BrainEpic = {
+			...epic,
+			id: this.generateId(),
+			createdAt: this.getTimestamp(),
+			updatedAt: this.getTimestamp(),
+		};
+		this._epics.push(newEpic);
+		this.addHistory("CREATE", "Epic", newEpic.id, `Added epic: ${newEpic.title}`);
+		this.addRecentChange(`Added epic: ${newEpic.title}`, "New epic created");
+		this.save();
+		return newEpic;
+	}
+
+	getEpics(): BrainEpic[] {
+		return this._epics;
+	}
+
+	// === FEATURES (FAZA 6) ===
+	private _features: BrainFeature[] = [];
+	
+	addFeature(feature: Omit<BrainFeature, "id" | "createdAt" | "updatedAt">): BrainFeature {
+		const newFeature: BrainFeature = {
+			...feature,
+			id: this.generateId(),
+			createdAt: this.getTimestamp(),
+			updatedAt: this.getTimestamp(),
+		};
+		this._features.push(newFeature);
+		
+		// Link to epic
+		const epic = this._epics.find(e => e.id === feature.epicId);
+		if (epic) {
+			epic.features.push(newFeature.id);
+		}
+		
+		this.addHistory("CREATE", "Feature", newFeature.id, `Added feature: ${newFeature.title}`);
+		this.save();
+		return newFeature;
+	}
+
+	getFeatures(): BrainFeature[] {
+		return this._features;
+	}
+
+	// === TASKS (FAZA 6) ===
+	private _tasks: HierarchyTask[] = [];
+	
+	addTask(task: Omit<HierarchyTask, "id" | "createdAt" | "updatedAt">): HierarchyTask {
+		const newTask: HierarchyTask = {
+			...task,
+			id: this.generateId(),
+			createdAt: this.getTimestamp(),
+			updatedAt: this.getTimestamp(),
+		};
+		this._tasks.push(newTask);
+		
+		// Link to feature
+		const feature = this._features.find(f => f.id === task.featureId);
+		if (feature) {
+			feature.tasks.push(newTask.id);
+		}
+		
+		this.addHistory("CREATE", "Task", newTask.id, `Added task: ${newTask.title}`);
+		this.save();
+		return newTask;
+	}
+
+	getTasks(): HierarchyTask[] {
+		return this._tasks;
 	}
 }

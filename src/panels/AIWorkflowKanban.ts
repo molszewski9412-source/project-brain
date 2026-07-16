@@ -64,6 +64,12 @@ export class AIWorkflowKanban {
                 case "approveProposal":
                     await this.approveProposal(msg.cardId);
                     break;
+                case "moveToDone":
+                    await this.handleMoveCard(msg.cardId, "REVIEW", "DONE");
+                    break;
+                case "moveToProgress":
+                    await this.handleMoveCard(msg.cardId, "REVIEW", "IN_PROGRESS");
+                    break;
                 case "unblockCard":
                     await this.unblockCard(msg.cardId);
                     break;
@@ -75,6 +81,7 @@ export class AIWorkflowKanban {
         const idea = this.store.getIdeas().find(i => i.id === cardId);
         if (!idea) return;
 
+        // BACKLOG → TODO: AI propose
         if (fromStatus === "BACKLOG" && toStatus === "TODO") {
             vscode.window.showInformationMessage("🤔 AI is analyzing...");
             try {
@@ -87,6 +94,7 @@ export class AIWorkflowKanban {
             return;
         }
 
+        // TODO → IN_PROGRESS: Create branch
         if (fromStatus === "TODO" && toStatus === "IN_PROGRESS") {
             const branchName = `feature/${idea.title.toLowerCase().replace(/\s+/g, '-')}`;
             try {
@@ -103,7 +111,21 @@ export class AIWorkflowKanban {
             return;
         }
 
-        if (fromStatus === "IN_PROGRESS" && toStatus === "DONE") {
+        // IN_PROGRESS → REVIEW: AI checks
+        if (fromStatus === "IN_PROGRESS" && toStatus === "REVIEW") {
+            vscode.window.showInformationMessage("👀 AI is reviewing...");
+            try {
+                const review = await this.getAIReview(idea);
+                this.panel.webview.postMessage({ command: "showReview", cardId, review });
+            } catch (error) {
+                this.store.updateIdeaStatus(cardId, "REVIEW");
+                this.update();
+            }
+            return;
+        }
+
+        // REVIEW → DONE: Lock module
+        if (fromStatus === "REVIEW" && toStatus === "DONE") {
             const modules = this.store.getModules();
             const existingModule = modules.find(m => m.name.toLowerCase() === idea.title.toLowerCase());
             
@@ -131,6 +153,19 @@ export class AIWorkflowKanban {
 
         this.store.updateIdeaStatus(cardId, toStatus);
         this.update();
+    }
+
+    private async getAIReview(idea: BrainIdea): Promise<string> {
+        const context = this.contextBuilder.buildContext({
+            purpose: "review",
+            question: `Review the implementation for: "${idea.title}"\n\n${idea.description || ""}\n\nCheck for: bugs, security, performance, style.`
+        });
+        try {
+            const result = await this.ollama.ask(context);
+            return result.success ? result.content : "AI not available";
+        } catch {
+            return "AI not available";
+        }
     }
 
     private async getAIProposal(idea: BrainIdea): Promise<string> {
@@ -196,10 +231,12 @@ export class AIWorkflowKanban {
         const modules = this.store.getModules();
         const lockedCount = modules.filter(m => m.locked).length;
         
+        // TASK 2.5: Dodanie kolumny REVIEW
         const columns = [
             { id: "BACKLOG", title: "📝 Backlog", color: "#555", hint: "All ideas" },
             { id: "TODO", title: "🤔 TODO", color: "#0079bf", hint: "AI proposes" },
             { id: "IN_PROGRESS", title: "⚡ In Progress", color: "#f5a623", hint: "Testing" },
+            { id: "REVIEW", title: "👀 Review", color: "#9b59b6", hint: "AI checks" },
             { id: "DONE", title: "✅ Done", color: "#27ae60", hint: "Locked!" }
         ];
 
@@ -224,6 +261,7 @@ h1{color:#00d4ff;font-size:1.4em}
 .card.BACKLOG{border-color:#555}
 .card.TODO{border-color:#0079bf}
 .card.IN_PROGRESS{border-color:#f5a623}
+.card.REVIEW{border-color:#9b59b6}
 .card.DONE{border-color:#27ae60;background:#1a3a1a}
 .card-title{font-weight:bold;color:#fff;margin-bottom:5px}
 .card-desc{font-size:0.8em;color:#888}
@@ -296,6 +334,12 @@ h1{color:#00d4ff;font-size:1.4em}
 <div class="modal-body" id="aiBody" style="background:#0a0a0f;padding:15px;border-radius:8px">Analyzing...</div>
 <div class="modal-actions"><button class="modal-btn primary" id="approveBtn" onclick="doApprove()">Approve</button><button class="modal-btn secondary" onclick="closeAi()">Cancel</button></div>
 </div></div>
+<div class="modal" id="reviewModal">
+<div class="modal-content">
+<div class="modal-header"><span class="modal-title">👀 AI Code Review</span><span class="modal-close" onclick="closeReview()">×</span></div>
+<div class="modal-body" id="reviewBody" style="background:#0a0a0f;padding:15px;border-radius:8px">Reviewing...</div>
+<div class="modal-actions"><button class="modal-btn primary" onclick="doApproveReview()">✅ Approve & Done</button><button class="modal-btn secondary" onclick="sendBackToProgress()">↩️ Fix issues</button></div>
+</div></div>
 <script>
 const vscode=acquireVsCodeApi();
 const cardData=${cardDataJson};
@@ -317,8 +361,9 @@ if(!card)return;
 let actions='';
 if(status==='BACKLOG')actions='<button class="modal-btn primary" onclick="moveTODO()">🤔 Move to TODO</button>';
 if(status==='TODO')actions='<button class="modal-btn primary" onclick="askAI()">🤖 Ask AI</button><button class="modal-btn secondary" onclick="moveProgress()">⚡ Start</button>';
-if(status==='IN_PROGRESS')actions='<button class="modal-btn primary" onclick="markDone()">✅ Done!</button>';
+if(status==='IN_PROGRESS')actions='<button class="modal-btn primary" onclick="moveReview()">👀 Review</button>';
 if(status==='DONE')actions='<button class="modal-btn secondary" onclick="unblock()">🔓 Unblock</button>';
+if(status==='REVIEW')actions='<button class="modal-btn primary" onclick="askAI()">🤖 Ask AI</button><button class="modal-btn secondary" onclick="sendBack()">↩️ Back</button>';
 actions+='<button class="modal-btn danger" onclick="deleteCard()">🗑️</button>';
 document.getElementById('dTitle').textContent=card.title;
 document.getElementById('dBody').innerHTML='<p>'+(card.desc||'No description')+'</p>';
@@ -329,17 +374,23 @@ document.getElementById('detailModal').classList.add('show');
 function closeDetail(){document.getElementById('detailModal').classList.remove('show');currentId=null}
 function moveTODO(){vscode.postMessage({command:'moveCard',cardId:currentId,fromStatus:'BACKLOG',toStatus:'TODO'});closeDetail()}
 function moveProgress(){vscode.postMessage({command:'moveCard',cardId:currentId,fromStatus:'TODO',toStatus:'IN_PROGRESS'});closeDetail()}
+function moveReview(){vscode.postMessage({command:'moveCard',cardId:currentId,fromStatus:'IN_PROGRESS',toStatus:'REVIEW'});closeDetail()}
+function sendBack(){vscode.postMessage({command:'moveCard',cardId:currentId,fromStatus:'REVIEW',toStatus:'IN_PROGRESS'});closeDetail()}
 function markDone(){vscode.postMessage({command:'moveCard',cardId:currentId,fromStatus:'IN_PROGRESS',toStatus:'DONE'});closeDetail()}
 function unblock(){vscode.postMessage({command:'unblockCard',cardId:currentId});closeDetail()}
 function deleteCard(){if(confirm('Delete?'))vscode.postMessage({command:'deleteCard',cardId:currentId});closeDetail()}
 function askAI(){vscode.postMessage({command:'askAI',cardId:currentId});closeDetail()}
 function closeAi(){document.getElementById('aiModal').classList.remove('show')}
 function doApprove(){vscode.postMessage({command:'approveProposal',cardId:currentId});closeAi()}
+function closeReview(){document.getElementById('reviewModal').classList.remove('show')}
+function doApproveReview(){vscode.postMessage({command:'moveToDone',cardId:currentId});closeReview()}
+function sendBackToProgress(){vscode.postMessage({command:'moveToProgress',cardId:currentId});closeReview()}
 
 window.addEventListener('message',e=>{
 const m=e.data;
 if(m.command==='showProposal'){document.getElementById('aiBody').innerHTML='<pre>'+m.proposal.replace(/</g,'&lt;')+'</pre>';currentId=m.cardId;document.getElementById('aiModal').classList.add('show')}
-if(m.command==='showAiChat')alert(m.content.substring(0,400))
+if(m.command==='showReview'){document.getElementById('reviewBody').innerHTML='<pre>'+m.review.replace(/</g,'&lt;')+'</pre>';currentId=m.cardId;document.getElementById('reviewModal').classList.add('show')}
+	if(m.command==='showAiChat')alert(m.content.substring(0,400))
 if(m.command==='refresh')location.reload()
 });
 </script></body></html>`;

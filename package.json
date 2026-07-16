@@ -2,7 +2,7 @@
   "name": "project-brain",
   "displayName": "Project Brain",
   "description": "Visual AI architecture map for software projects",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "engines": {
     "vscode": "^1.125.0"
   },
@@ -84,6 +84,94 @@
         "command": "project-brain.openAIWorkflow",
         "title": "Project Brain: AI Workflow Kanban"
       },
+      {
+        "command": "project-brain.openCanvas",
+        "title": "Project Brain: Open Visual Brain Canvas"
+      },
+      {
+        "command": "project-brain.generateCode",
+        "title": "Project Brain: Generate Code"
+      },
+      {
+        "command": "project-brain.createProject",
+        "title": "Project Brain: Create New Project"
+      },
+      {
+        "command": "project-brain.reviewCode",
+        "title": "Project Brain: AI Code Review"
+      },
+      {
+        "command": "project-brain.openPlanner",
+        "title": "Project Brain: Open AI Planner"
+      },
+      {
+        "command": "project-brain.openTimeline",
+        "title": "Project Brain: Open Timeline"
+      },
+      {
+        "command": "project-brain.openChat",
+        "title": "Project Brain: Open AI Chat"
+      },
+      {
+        "command": "project-brain.refactor",
+        "title": "Project Brain: Code Refactor"
+      },
+      {
+        "command": "project-brain.marketplace",
+        "title": "Project Brain: Open Marketplace"
+      },
+      {
+        "command": "project-brain.promptEngine",
+        "title": "Project Brain: Prompt Engine"
+      },
+      {
+        "command": "project-brain.dependencyGraph",
+        "title": "Project Brain: Dependency Graph"
+      },
+      {
+        "command": "project-brain.testRunner",
+        "title": "Project Brain: Test Runner"
+      },
+      {
+        "command": "project-brain.monitoring",
+        "title": "Project Brain: Monitoring"
+      },
+      {
+        "command": "project-brain.documentation",
+        "title": "Project Brain: Documentation"
+      },
+      {
+        "command": "project-brain.multiAgent",
+        "title": "Project Brain: Multi Agent"
+      },
+      {
+        "command": "project-brain.deployment",
+        "title": "Project Brain: Deployment"
+      },
+      {
+        "command": "project-brain.team",
+        "title": "Project Brain: Team"
+      },
+      {
+        "command": "project-brain.smartSearch",
+        "title": "Project Brain: Smart Search"
+      },
+      {
+        "command": "project-brain.aiLearning",
+        "title": "Project Brain: AI Learning"
+      },
+      {
+        "command": "project-brain.simulator",
+        "title": "Project Brain: Project Simulator"
+      },
+      {
+        "command": "project-brain.release",
+        "title": "Project Brain: Release 1.0"
+      },
+      {
+        "command": "project-brain.decisionLearning",
+        "title": "Project Brain: Decision Learning"
+      },
 
       {
         "command": "project-brain.openProposal",
@@ -124,6 +212,11 @@
         }
       ],
       "view/title": [
+        {
+          "command": "project-brain.openCanvas",
+          "when": "view == projectBrainView",
+          "group": "navigation"
+        },
         {
           "command": "project-brain.analyzeProject",
           "when": "view == projectBrainView",

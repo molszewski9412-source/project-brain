@@ -4,7 +4,7 @@
 import { BrainStore } from "../storage/BrainStore";
 
 export interface AIRequest {
-    purpose: "analyze" | "suggest" | "implement" | "review" | "explain";
+    purpose: "analyze" | "suggest" | "implement" | "review" | "explain" | "generate";
     question?: string;
     targetModuleId?: string;
 }

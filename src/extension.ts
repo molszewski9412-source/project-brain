@@ -5,6 +5,28 @@ import { ModuleCardPanel } from './panels/ModuleCardPanel';
 import { InitializePanel } from './panels/InitializePanel';
 import { ProposalPanel } from './panels/ProposalPanel';
 import { AIWorkflowKanban } from './panels/AIWorkflowKanban';
+import { CanvasPanel } from './panels/CanvasPanel';
+import { CodeGeneratorPanel } from './panels/CodeGeneratorPanel';
+import { ProjectCreatorPanel } from './panels/ProjectCreatorPanel';
+import { AIReviewPanel } from './services/AIReviewService';
+import { AIPlannerPanel } from './panels/AIPlannerPanel';
+import { TimelinePanel } from './panels/TimelinePanel';
+import { AIChatPanel } from './panels/AIChatPanel';
+import { RefactorPanel } from './panels/RefactorPanel';
+import { MarketplacePanel } from './panels/MarketplacePanel';
+import { PromptEnginePanel } from './panels/PromptEnginePanel';
+import { DependencyGraphPanel } from './panels/DependencyGraphPanel';
+import { TestRunnerPanel } from './panels/TestRunnerPanel';
+import { MonitoringPanel } from './panels/MonitoringPanel';
+import { DocumentationPanel } from './panels/DocumentationPanel';
+import { MultiAgentPanel } from './panels/MultiAgentPanel';
+import { DeploymentPanel } from './panels/DeploymentPanel';
+import { TeamPanel } from './panels/TeamPanel';
+import { SmartSearchPanel } from './panels/SmartSearchPanel';
+import { AILearningPanel } from './panels/AILearningPanel';
+import { ProjectSimulatorPanel } from './panels/ProjectSimulatorPanel';
+import { ReleasePanel } from './panels/ReleasePanel';
+import { DecisionLearningPanel } from './panels/DecisionLearningPanel';
 import { addDecision } from './commands/addDecision';
 import { analyzeModule } from './commands/analyzeModule';
 import { analyzeProject } from './commands/analyzeProject';
@@ -126,6 +148,163 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(
         vscode.commands.registerCommand('project-brain.openKanban', () => {
             AIWorkflowKanban.createOrShow();
+        })
+    );
+
+    // === CANVAS COMMANDS ===
+
+    // Open Visual Brain Canvas
+    context.subscriptions.push(
+        vscode.commands.registerCommand('project-brain.openCanvas', () => {
+            CanvasPanel.createOrShow();
+        })
+    );
+
+    // Open Code Generator
+    context.subscriptions.push(
+        vscode.commands.registerCommand('project-brain.generateCode', () => {
+            CodeGeneratorPanel.createOrShow();
+        })
+    );
+
+    // Open Project Creator
+    context.subscriptions.push(
+        vscode.commands.registerCommand('project-brain.createProject', () => {
+            ProjectCreatorPanel.createOrShow();
+        })
+    );
+
+    // Open AI Code Review
+    context.subscriptions.push(
+        vscode.commands.registerCommand('project-brain.reviewCode', async () => {
+            const panel = AIReviewPanel.createOrShow();
+            await panel.runFullReview();
+        })
+    );
+
+    // Open AI Planner
+    context.subscriptions.push(
+        vscode.commands.registerCommand('project-brain.openPlanner', () => {
+            AIPlannerPanel.createOrShow();
+        })
+    );
+
+    // Open Timeline
+    context.subscriptions.push(
+        vscode.commands.registerCommand('project-brain.openTimeline', () => {
+            TimelinePanel.createOrShow();
+        })
+    );
+
+    // Open AI Chat
+    context.subscriptions.push(
+        vscode.commands.registerCommand('project-brain.openChat', () => {
+            AIChatPanel.createOrShow();
+        })
+    );
+
+    // Open Refactor
+    context.subscriptions.push(
+        vscode.commands.registerCommand('project-brain.refactor', () => {
+            RefactorPanel.createOrShow();
+        })
+    );
+
+    // Open Marketplace
+    context.subscriptions.push(
+        vscode.commands.registerCommand('project-brain.marketplace', () => {
+            MarketplacePanel.createOrShow();
+        })
+    );
+
+    // Open Prompt Engine
+    context.subscriptions.push(
+        vscode.commands.registerCommand('project-brain.promptEngine', () => {
+            PromptEnginePanel.createOrShow();
+        })
+    );
+
+    // Open Dependency Graph
+    context.subscriptions.push(
+        vscode.commands.registerCommand('project-brain.dependencyGraph', () => {
+            DependencyGraphPanel.createOrShow();
+        })
+    );
+
+    // Open Test Runner
+    context.subscriptions.push(
+        vscode.commands.registerCommand('project-brain.testRunner', () => {
+            TestRunnerPanel.createOrShow();
+        })
+    );
+
+    // Open Monitoring
+    context.subscriptions.push(
+        vscode.commands.registerCommand('project-brain.monitoring', () => {
+            MonitoringPanel.createOrShow();
+        })
+    );
+
+    // Open Documentation
+    context.subscriptions.push(
+        vscode.commands.registerCommand('project-brain.documentation', () => {
+            DocumentationPanel.createOrShow();
+        })
+    );
+
+    // Open Multi Agent
+    context.subscriptions.push(
+        vscode.commands.registerCommand('project-brain.multiAgent', () => {
+            MultiAgentPanel.createOrShow();
+        })
+    );
+
+    // Open Deployment
+    context.subscriptions.push(
+        vscode.commands.registerCommand('project-brain.deployment', () => {
+            DeploymentPanel.createOrShow();
+        })
+    );
+
+    // Open Team
+    context.subscriptions.push(
+        vscode.commands.registerCommand('project-brain.team', () => {
+            TeamPanel.createOrShow();
+        })
+    );
+
+    // Open Smart Search
+    context.subscriptions.push(
+        vscode.commands.registerCommand('project-brain.smartSearch', () => {
+            SmartSearchPanel.createOrShow();
+        })
+    );
+
+    // Open AI Learning
+    context.subscriptions.push(
+        vscode.commands.registerCommand('project-brain.aiLearning', () => {
+            AILearningPanel.createOrShow();
+        })
+    );
+
+    // Open Project Simulator
+    context.subscriptions.push(
+        vscode.commands.registerCommand('project-brain.simulator', () => {
+            ProjectSimulatorPanel.createOrShow();
+        })
+    );
+
+    // Open Release Panel
+    context.subscriptions.push(
+        vscode.commands.registerCommand('project-brain.release', () => {
+            ReleasePanel.createOrShow();
+        })
+    );
+
+    // Open Decision Learning
+    context.subscriptions.push(
+        vscode.commands.registerCommand('project-brain.decisionLearning', () => {
+            DecisionLearningPanel.createOrShow();
         })
     );
 
